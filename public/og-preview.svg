@@ -1,0 +1,15 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" rx="48" fill="#E8E2D8"/>
+  <circle cx="220" cy="140" r="180" fill="white" fill-opacity="0.45"/>
+  <circle cx="980" cy="160" r="220" fill="#E4572E" fill-opacity="0.12"/>
+  <rect x="90" y="90" width="1020" height="450" rx="42" fill="#EBE5DB" stroke="white" stroke-opacity="0.5"/>
+  <rect x="130" y="140" width="620" height="350" rx="32" fill="#DDD5C8"/>
+  <circle cx="300" cy="260" r="70" fill="#E4572E" fill-opacity="0.28"/>
+  <circle cx="470" cy="330" r="95" fill="#E4572E" fill-opacity="0.2"/>
+  <circle cx="360" cy="300" r="28" fill="#E4572E"/>
+  <circle cx="360" cy="300" r="18" fill="#F3B59A"/>
+  <circle cx="560" cy="360" r="22" stroke="#6F675C" stroke-width="3" stroke-dasharray="6 6" fill="#EBE4D8"/>
+  <text x="790" y="250" fill="#2C2924" font-family="Georgia, serif" font-size="54">Strava World</text>
+  <text x="790" y="310" fill="#6F675C" font-family="Arial, sans-serif" font-size="24">Heatmaps · routes · run photos</text>
+  <text x="790" y="360" fill="#E4572E" font-family="Arial, sans-serif" font-size="20">neumorphic atlas</text>
+</svg>

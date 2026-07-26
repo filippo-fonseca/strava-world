@@ -31,7 +31,3 @@ export function formatDate(iso: string) {
 export function formatElevation(meters: number) {
   return `${Math.round(meters)} m`;
 }
-
-export function clsx(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
