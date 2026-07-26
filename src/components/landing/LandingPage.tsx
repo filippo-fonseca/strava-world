@@ -122,10 +122,25 @@ export function LandingPage({ stravaConfigured }: Props) {
             </motion.div>
 
             {error && (
-              <p className="mt-4 text-sm text-[var(--neu-accent)]">
-                Sign-in issue: {error.replaceAll("_", " ")}. You can still explore
-                the demo atlas.
-              </p>
+              <div className="mt-4 max-w-lg space-y-1 text-sm text-[var(--neu-accent)]">
+                <p>
+                  Sign-in issue: {error.replaceAll("_", " ")}. You can still
+                  explore the demo atlas.
+                </p>
+                {searchParams.get("detail") && (
+                  <p className="break-all text-xs text-[var(--neu-muted)]">
+                    {searchParams.get("detail")}
+                  </p>
+                )}
+                {error === "oauth_failed" && (
+                  <p className="text-xs text-[var(--neu-muted)]">
+                    Strava Authorization Callback Domain must match this site&apos;s
+                    exact host (e.g. <code>stravaworld.hyperpolymath.com</code>,
+                    not only <code>hyperpolymath.com</code>). Also set{" "}
+                    <code>NEXT_PUBLIC_APP_URL</code> in Vercel to that same URL.
+                  </p>
+                )}
+              </div>
             )}
 
             {!stravaConfigured && (

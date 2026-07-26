@@ -33,22 +33,18 @@ Open [http://localhost:3000](http://localhost:3000) and click **Explore demo wor
 ## Strava API setup
 
 1. Create an app at [Strava API settings](https://www.strava.com/settings/api)
-2. Set **Authorization Callback Domain** to the host only (no `https://`, no path):
+2. Set **Authorization Callback Domain** to the host only (no `https://`, no path).
+   Strava only allows **one** domain — use the exact host users open:
    - Local: `localhost`
-   - Production: `strava-world-six.vercel.app`
+   - Custom domain: `stravaworld.hyperpolymath.com` ← **not** `hyperpolymath.com`
+   - Or Vercel default: `strava-world-six.vercel.app`
 3. Copy values into `.env.local` (or Vercel Project → Settings → Environment Variables):
 
 ```env
 STRAVA_CLIENT_ID=your_client_id
 STRAVA_CLIENT_SECRET=your_client_secret
 SESSION_SECRET=paste-a-long-random-string-here
-```
-
-Optional (auto-detected from the request on Vercel, but recommended in prod):
-
-```env
-NEXT_PUBLIC_APP_URL=https://strava-world-six.vercel.app
-STRAVA_REDIRECT_URI=https://strava-world-six.vercel.app/api/auth/callback
+NEXT_PUBLIC_APP_URL=https://stravaworld.hyperpolymath.com
 ```
 
 Generate a session secret:
@@ -59,12 +55,18 @@ openssl rand -base64 48
 
 Requested scopes: `read`, `activity:read_all`, `profile:read_all`.
 
-### Vercel checklist
+### Vercel + custom domain checklist
 
-In Vercel env vars, set at least the 3 required keys above for **Production**.  
-If you previously set `STRAVA_REDIRECT_URI` / `NEXT_PUBLIC_APP_URL` to `localhost`, change them to:
+1. Domains → add `stravaworld.hyperpolymath.com`
+2. Env (Production):
+   - `STRAVA_CLIENT_ID`
+   - `STRAVA_CLIENT_SECRET`
+   - `SESSION_SECRET`
+   - `NEXT_PUBLIC_APP_URL=https://stravaworld.hyperpolymath.com`
+3. Strava → Authorization Callback Domain = `stravaworld.hyperpolymath.com`
+4. Redeploy
 
-`https://strava-world-six.vercel.app` (and the `/api/auth/callback` path for the redirect URI), then **redeploy**.
+Do **not** leave `STRAVA_REDIRECT_URI` pointed at `*.vercel.app` if you sign in on the custom domain.
 
 ## Scripts
 
