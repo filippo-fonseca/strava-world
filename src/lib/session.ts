@@ -5,6 +5,8 @@ import type { SessionAthlete } from "@/lib/types";
 export type AppSession = {
   athlete?: SessionAthlete;
   isDemo?: boolean;
+  /** Bumped on manual Sync so server cache keys rotate. */
+  runsCacheEpoch?: number;
 };
 
 function getSessionPassword() {

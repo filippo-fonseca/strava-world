@@ -15,6 +15,7 @@ Connect Strava (or explore the demo) and see where you’ve run on a world map �
 - **Heatmap / Routes / Photos** viewing modes
 - **Run photos** pulled from Strava, pinned on the map
 - **No-photo indicators** so every run still has a place in the atlas
+- **Smart caching** — IndexedDB on device + 6h server cache; **Sync** pulls fresh from Strava
 - **Demo mode** with worldwide sample runs so you can try it instantly
 - **Away-inspired neumorphic UI** — soft clay surfaces, warm paper tones, quiet motion
 
