@@ -250,30 +250,64 @@ export async function fetchAthlete(accessToken: string): Promise<AthleteSummary>
   };
 }
 
+const RUN_SPORTS = new Set(["Run", "TrailRun", "VirtualRun"]);
+
+function isRunActivity(activity: StravaActivity) {
+  return RUN_SPORTS.has(activity.sport_type) || activity.type === "Run";
+}
+
 export async function fetchRunActivities(
   accessToken: string,
-  options?: { page?: number; perPage?: number },
+  options?: {
+    /** Max activity pages to scan (200 activities/page). Default covers ~4000 activities. */
+    maxPages?: number;
+    perPage?: number;
+    /** Max runs to return after filtering. */
+    maxRuns?: number;
+    /** Max photo detail fetches (keeps us under Strava rate limits). */
+    maxPhotoFetches?: number;
+  },
 ): Promise<RunActivity[]> {
-  const page = options?.page ?? 1;
-  const perPage = options?.perPage ?? 80;
-  const params = new URLSearchParams({
-    page: String(page),
-    per_page: String(perPage),
-  });
+  const perPage = Math.min(options?.perPage ?? 200, 200);
+  const maxPages = options?.maxPages ?? 20;
+  const maxRuns = options?.maxRuns ?? 2000;
+  const maxPhotoFetches = options?.maxPhotoFetches ?? 60;
 
-  const activities = await stravaFetch<StravaActivity[]>(
-    `/athlete/activities?${params.toString()}`,
-    accessToken,
-  );
+  const runSummaries: StravaActivity[] = [];
 
-  const runs = activities.filter((a) =>
-    ["Run", "TrailRun", "VirtualRun"].includes(a.sport_type || a.type),
-  );
+  for (let page = 1; page <= maxPages; page += 1) {
+    const params = new URLSearchParams({
+      page: String(page),
+      per_page: String(perPage),
+    });
 
-  // Enrich a bounded set with photos so the map stays snappy.
-  const enriched = await Promise.all(
-    runs.slice(0, 40).map(async (activity) => {
-      if (!activity.total_photo_count) return mapActivity(activity);
+    const batch = await stravaFetch<StravaActivity[]>(
+      `/athlete/activities?${params.toString()}`,
+      accessToken,
+    );
+
+    if (!batch.length) break;
+
+    for (const activity of batch) {
+      if (!isRunActivity(activity)) continue;
+      runSummaries.push(activity);
+      if (runSummaries.length >= maxRuns) break;
+    }
+
+    if (runSummaries.length >= maxRuns) break;
+    // Last page is short → no more history.
+    if (batch.length < perPage) break;
+  }
+
+  // Enrich a bounded set that actually has photos; map the rest from summary polyline.
+  let photoFetches = 0;
+  const mapped = await Promise.all(
+    runSummaries.map(async (activity) => {
+      const hasPhotos = (activity.total_photo_count || 0) > 0;
+      if (!hasPhotos || photoFetches >= maxPhotoFetches) {
+        return mapActivity(activity);
+      }
+      photoFetches += 1;
       try {
         const photos = await fetchActivityPhotos(accessToken, activity.id);
         return mapActivity(activity, photos);
@@ -283,8 +317,7 @@ export async function fetchRunActivities(
     }),
   );
 
-  const remainder = runs.slice(40).map((a) => mapActivity(a));
-  return [...enriched, ...remainder];
+  return mapped;
 }
 
 export async function fetchActivityPhotos(

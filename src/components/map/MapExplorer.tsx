@@ -114,7 +114,7 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
           </NeuPanel>
           {loading ? (
             <NeuPanel className="flex flex-1 items-center justify-center text-[var(--neu-muted)]">
-              Plotting your world…
+              Fetching your run history from Strava…
             </NeuPanel>
           ) : error ? (
             <NeuPanel className="flex flex-1 items-center justify-center text-[var(--neu-accent)]">
