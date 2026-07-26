@@ -300,14 +300,16 @@ export async function fetchRunActivities(
   }
 
   // Enrich a bounded set that actually has photos; map the rest from summary polyline.
-  let photoFetches = 0;
+  const photoIds = new Set(
+    runSummaries
+      .filter((activity) => (activity.total_photo_count || 0) > 0)
+      .slice(0, maxPhotoFetches)
+      .map((activity) => activity.id),
+  );
+
   const mapped = await Promise.all(
     runSummaries.map(async (activity) => {
-      const hasPhotos = (activity.total_photo_count || 0) > 0;
-      if (!hasPhotos || photoFetches >= maxPhotoFetches) {
-        return mapActivity(activity);
-      }
-      photoFetches += 1;
+      if (!photoIds.has(activity.id)) return mapActivity(activity);
       try {
         const photos = await fetchActivityPhotos(accessToken, activity.id);
         return mapActivity(activity, photos);
