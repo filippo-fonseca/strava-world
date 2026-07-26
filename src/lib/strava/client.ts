@@ -10,14 +10,15 @@ import type {
 const STRAVA_API = "https://www.strava.com/api/v3";
 const STRAVA_OAUTH = "https://www.strava.com/oauth";
 
-export function getStravaConfig() {
+export function getStravaConfig(redirectUri?: string) {
   const clientId = process.env.STRAVA_CLIENT_ID;
   const clientSecret = process.env.STRAVA_CLIENT_SECRET;
-  const redirectUri =
+  const resolvedRedirectUri =
+    redirectUri ||
     process.env.STRAVA_REDIRECT_URI ||
     `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/callback`;
 
-  return { clientId, clientSecret, redirectUri };
+  return { clientId, clientSecret, redirectUri: resolvedRedirectUri };
 }
 
 export function isStravaConfigured() {
@@ -25,8 +26,17 @@ export function isStravaConfigured() {
   return Boolean(clientId && clientSecret);
 }
 
-export function getAuthorizeUrl(state = "strava-world") {
-  const { clientId, redirectUri } = getStravaConfig();
+export function getAuthorizeUrl(
+  options: { state?: string; redirectUri: string } | string = "strava-world",
+) {
+  const state =
+    typeof options === "string" ? options : (options.state ?? "strava-world");
+  const redirectUri =
+    typeof options === "string"
+      ? getStravaConfig().redirectUri
+      : options.redirectUri;
+
+  const { clientId } = getStravaConfig(redirectUri);
   if (!clientId) throw new Error("STRAVA_CLIENT_ID is not configured");
 
   const params = new URLSearchParams({
@@ -55,8 +65,12 @@ type TokenResponse = {
   };
 };
 
-export async function exchangeCode(code: string): Promise<SessionAthlete> {
-  const { clientId, clientSecret } = getStravaConfig();
+export async function exchangeCode(
+  code: string,
+  redirectUri?: string,
+): Promise<SessionAthlete> {
+  const { clientId, clientSecret, redirectUri: resolvedRedirectUri } =
+    getStravaConfig(redirectUri);
   if (!clientId || !clientSecret) {
     throw new Error("Strava credentials are not configured");
   }
@@ -69,6 +83,8 @@ export async function exchangeCode(code: string): Promise<SessionAthlete> {
       client_secret: clientSecret,
       code,
       grant_type: "authorization_code",
+      // Must match the redirect_uri used in the authorize step.
+      redirect_uri: resolvedRedirectUri,
     }),
     cache: "no-store",
   });

@@ -33,15 +33,22 @@ Open [http://localhost:3000](http://localhost:3000) and click **Explore demo wor
 ## Strava API setup
 
 1. Create an app at [Strava API settings](https://www.strava.com/settings/api)
-2. Set **Authorization Callback Domain** to your host (for local: `localhost`)
-3. Copy values into `.env.local`:
+2. Set **Authorization Callback Domain** to the host only (no `https://`, no path):
+   - Local: `localhost`
+   - Production: `strava-world-six.vercel.app`
+3. Copy values into `.env.local` (or Vercel Project → Settings → Environment Variables):
 
 ```env
 STRAVA_CLIENT_ID=your_client_id
 STRAVA_CLIENT_SECRET=your_client_secret
-STRAVA_REDIRECT_URI=http://localhost:3000/api/auth/callback
-NEXT_PUBLIC_APP_URL=http://localhost:3000
 SESSION_SECRET=paste-a-long-random-string-here
+```
+
+Optional (auto-detected from the request on Vercel, but recommended in prod):
+
+```env
+NEXT_PUBLIC_APP_URL=https://strava-world-six.vercel.app
+STRAVA_REDIRECT_URI=https://strava-world-six.vercel.app/api/auth/callback
 ```
 
 Generate a session secret:
@@ -51,6 +58,13 @@ openssl rand -base64 48
 ```
 
 Requested scopes: `read`, `activity:read_all`, `profile:read_all`.
+
+### Vercel checklist
+
+In Vercel env vars, set at least the 3 required keys above for **Production**.  
+If you previously set `STRAVA_REDIRECT_URI` / `NEXT_PUBLIC_APP_URL` to `localhost`, change them to:
+
+`https://strava-world-six.vercel.app` (and the `/api/auth/callback` path for the redirect URI), then **redeploy**.
 
 ## Scripts
 

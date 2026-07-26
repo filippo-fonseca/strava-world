@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { appPath, getStravaRedirectUri } from "@/lib/app-url";
 import { getSession } from "@/lib/session";
 import { exchangeCode } from "@/lib/strava/client";
-
-function appUrl(path: string) {
-  return new URL(path, process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
-}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -12,22 +9,25 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
 
   if (error) {
-    return NextResponse.redirect(appUrl(`/?error=${encodeURIComponent(error)}`));
+    return NextResponse.redirect(
+      appPath(`/?error=${encodeURIComponent(error)}`, request),
+    );
   }
 
   if (!code) {
-    return NextResponse.redirect(appUrl("/?error=missing_code"));
+    return NextResponse.redirect(appPath("/?error=missing_code", request));
   }
 
   try {
-    const athlete = await exchangeCode(code);
+    const redirectUri = getStravaRedirectUri(request);
+    const athlete = await exchangeCode(code, redirectUri);
     const session = await getSession();
     session.athlete = athlete;
     session.isDemo = false;
     await session.save();
-    return NextResponse.redirect(appUrl("/map"));
+    return NextResponse.redirect(appPath("/map", request));
   } catch (err) {
     console.error(err);
-    return NextResponse.redirect(appUrl("/?error=oauth_failed"));
+    return NextResponse.redirect(appPath("/?error=oauth_failed", request));
   }
 }

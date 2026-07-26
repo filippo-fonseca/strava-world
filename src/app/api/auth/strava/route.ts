@@ -1,15 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { appPath, getStravaRedirectUri } from "@/lib/app-url";
 import { getAuthorizeUrl, isStravaConfigured } from "@/lib/strava/client";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (!isStravaConfigured()) {
     return NextResponse.redirect(
-      new URL(
-        "/?error=strava_not_configured",
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      ),
+      appPath("/?error=strava_not_configured", request),
     );
   }
 
-  return NextResponse.redirect(getAuthorizeUrl());
+  const redirectUri = getStravaRedirectUri(request);
+  return NextResponse.redirect(getAuthorizeUrl({ redirectUri }));
 }
