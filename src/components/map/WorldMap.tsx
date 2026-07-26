@@ -63,7 +63,7 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
           initialViewState={{ longitude: 10, latitude: 25, zoom: 1.5 }}
           mapStyle={MAP_STYLE}
           style={{ width: "100%", height: "100%" }}
-          attributionControl
+          attributionControl={{ compact: true }}
           interactiveLayerIds={mode === "routes" ? ["run-routes-hit"] : []}
           onClick={handleClick}
           cursor={mode === "routes" ? "pointer" : "grab"}
