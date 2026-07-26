@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { LogOut, RefreshCw, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { AthleteSummary, MapMode, RunActivity } from "@/lib/types";
@@ -10,8 +10,14 @@ import {
   isCacheFresh,
   readRunsCache,
   RUNS_CACHE_MAX_AGE_MS,
-  writeRunsCache,
 } from "@/lib/runs-cache";
+import {
+  applySyncResponse,
+  fetchActivitiesFromApi,
+  shouldFullRebuild,
+  syncCursorFromCache,
+  type SyncMode,
+} from "@/lib/sync-runs";
 import { WorldMap } from "@/components/map/WorldMap";
 import { ModeToggle } from "@/components/map/ModeToggle";
 import { ActivityList } from "@/components/map/ActivityList";
@@ -25,14 +31,6 @@ type Props = {
   isDemo: boolean;
 };
 
-type ActivitiesResponse = {
-  activities: RunActivity[];
-  syncedAt?: string;
-  source?: string;
-  isDemo?: boolean;
-  error?: string;
-};
-
 export function MapExplorer({ initialAthlete, isDemo }: Props) {
   const router = useRouter();
   const [activities, setActivities] = useState<RunActivity[]>([]);
@@ -40,79 +38,165 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
   const [mode, setMode] = useState<MapMode>("heatmap");
   const [selected, setSelected] = useState<RunActivity | null>(null);
   const [query, setQuery] = useState("");
   const [, startTransition] = useTransition();
+  const activitiesRef = useRef<RunActivity[]>([]);
+  const syncedAtRef = useRef<string | null>(null);
+  const syncingRef = useRef(false);
+
+  useEffect(() => {
+    activitiesRef.current = activities;
+  }, [activities]);
+
+  useEffect(() => {
+    syncedAtRef.current = syncedAt;
+  }, [syncedAt]);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function persist(
-      data: ActivitiesResponse,
+    function commitResult(
+      nextActivities: RunActivity[],
+      nextSyncedAt: string,
+      note: string | null,
     ) {
-      const nextSyncedAt = data.syncedAt ?? new Date().toISOString();
       startTransition(() => {
-        setActivities(data.activities);
+        setActivities(nextActivities);
         setSyncedAt(nextSyncedAt);
+        setSelected((current) => {
+          if (!current) return null;
+          return nextActivities.find((item) => item.id === current.id) ?? null;
+        });
+        setStatusNote(note);
       });
-      await writeRunsCache({
-        athleteId: isDemo ? "demo" : (initialAthlete?.id ?? "demo"),
-        isDemo,
-        syncedAt: nextSyncedAt,
-        activities: data.activities,
-      });
+      activitiesRef.current = nextActivities;
+      syncedAtRef.current = nextSyncedAt;
     }
 
-    async function syncFromNetwork(refresh: boolean, background: boolean) {
-      if (!background) setLoading(true);
+    async function runSync(options: {
+      mode: SyncMode;
+      forceRefresh?: boolean;
+      background?: boolean;
+      since?: string | null;
+    }) {
+      if (syncingRef.current) return;
+      syncingRef.current = true;
+      if (!options.background) setLoading(true);
       setSyncing(true);
-      setError(null);
+      if (!options.background) setError(null);
 
       try {
-        const url = refresh ? "/api/activities?refresh=1" : "/api/activities";
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error("Could not load activities");
-        const data = (await res.json()) as ActivitiesResponse;
+        const response = await fetchActivitiesFromApi({
+          mode: options.mode,
+          since: options.since,
+          forceRefresh: options.forceRefresh,
+        });
         if (cancelled) return;
-        await persist(data);
+
+        const result = await applySyncResponse({
+          existing: activitiesRef.current,
+          response,
+          athleteId: initialAthlete?.id,
+          isDemo,
+        });
+
+        let note: string | null = null;
+        if (result.mode === "incremental") {
+          if (result.added > 0 || result.updated > 0) {
+            const parts = [];
+            if (result.added > 0) {
+              parts.push(
+                `${result.added} new run${result.added === 1 ? "" : "s"}`,
+              );
+            }
+            if (result.updated > 0) {
+              parts.push(
+                `${result.updated} updated`,
+              );
+            }
+            note = parts.join(" · ");
+          } else {
+            note = "Already up to date";
+          }
+        } else {
+          note = `Loaded ${result.activities.length} runs`;
+        }
+
+        commitResult(result.activities, result.syncedAt, note);
+        setError(null);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load");
+          // Keep showing cached atlas if we have one.
+          if (activitiesRef.current.length === 0) {
+            setError(err instanceof Error ? err.message : "Failed to load");
+          } else {
+            setStatusNote("Sync failed — showing cached runs");
+          }
         }
       } finally {
         if (!cancelled) {
           setLoading(false);
           setSyncing(false);
         }
+        syncingRef.current = false;
       }
     }
 
     async function bootstrap() {
       setError(null);
-
       const cached = await readRunsCache(initialAthlete?.id, isDemo);
       if (cancelled) return;
 
       if (cached?.activities?.length) {
-        setActivities(cached.activities);
-        setSyncedAt(cached.syncedAt);
+        commitResult(cached.activities, cached.syncedAt, null);
         setLoading(false);
 
-        if (isCacheFresh(cached.syncedAt, RUNS_CACHE_MAX_AGE_MS)) {
+        if (shouldFullRebuild(cached.syncedAt)) {
+          void runSync({ mode: "full", forceRefresh: true, background: true });
           return;
         }
 
-        void syncFromNetwork(false, true);
+        if (!isCacheFresh(cached.syncedAt, RUNS_CACHE_MAX_AGE_MS)) {
+          void runSync({
+            mode: "incremental",
+            since: syncCursorFromCache(cached),
+            background: true,
+          });
+        }
         return;
       }
 
-      await syncFromNetwork(false, false);
+      await runSync({ mode: "full", background: false });
     }
 
     void bootstrap();
+
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      if (syncingRef.current) return;
+      const cursor = syncedAtRef.current;
+      if (!cursor) return;
+      if (isCacheFresh(cursor, RUNS_CACHE_MAX_AGE_MS)) return;
+
+      if (shouldFullRebuild(cursor)) {
+        void runSync({ mode: "full", forceRefresh: true, background: true });
+      } else {
+        void runSync({
+          mode: "incremental",
+          since:
+            newestCursor(activitiesRef.current) || cursor,
+          background: true,
+        });
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [initialAthlete?.id, isDemo]);
 
@@ -126,27 +210,72 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
     );
   }, [activities, query]);
 
-  async function handleSync() {
+  async function handleSync(forceFull = false) {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setSyncing(true);
     setError(null);
+    setStatusNote(null);
+
     try {
-      const res = await fetch("/api/activities?refresh=1", { cache: "no-store" });
-      if (!res.ok) throw new Error("Could not sync activities");
-      const data = (await res.json()) as ActivitiesResponse;
-      const nextSyncedAt = data.syncedAt ?? new Date().toISOString();
-      setActivities(data.activities);
-      setSyncedAt(nextSyncedAt);
-      await writeRunsCache({
-        athleteId: isDemo ? "demo" : (initialAthlete?.id ?? "demo"),
-        isDemo,
-        syncedAt: nextSyncedAt,
-        activities: data.activities,
+      const useFull =
+        forceFull ||
+        activitiesRef.current.length === 0 ||
+        shouldFullRebuild(syncedAtRef.current);
+
+      const response = await fetchActivitiesFromApi({
+        mode: useFull ? "full" : "incremental",
+        since: useFull
+          ? null
+          : newestCursor(activitiesRef.current) || syncedAtRef.current,
+        forceRefresh: useFull,
       });
+
+      const result = await applySyncResponse({
+        existing: activitiesRef.current,
+        response,
+        athleteId: initialAthlete?.id,
+        isDemo,
+      });
+
+      startTransition(() => {
+        setActivities(result.activities);
+        setSyncedAt(result.syncedAt);
+        setSelected((current) => {
+          if (!current) return null;
+          return result.activities.find((item) => item.id === current.id) ?? null;
+        });
+        if (result.mode === "incremental") {
+          if (result.added || result.updated) {
+            setStatusNote(
+              [
+                result.added
+                  ? `${result.added} new run${result.added === 1 ? "" : "s"}`
+                  : null,
+                result.updated ? `${result.updated} updated` : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            );
+          } else {
+            setStatusNote("Already up to date");
+          }
+        } else {
+          setStatusNote(`Rebuilt ${result.activities.length} runs`);
+        }
+      });
+      activitiesRef.current = result.activities;
+      syncedAtRef.current = result.syncedAt;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sync failed");
+      if (activitiesRef.current.length === 0) {
+        setError(err instanceof Error ? err.message : "Sync failed");
+      } else {
+        setStatusNote("Sync failed — showing cached runs");
+      }
     } finally {
       setLoading(false);
       setSyncing(false);
+      syncingRef.current = false;
     }
   }
 
@@ -177,6 +306,7 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
               {isDemo ? " · Demo atlas" : " · Live Strava"}
               {" · "}
               {formatSyncedAt(syncedAt)}
+              {statusNote ? ` · ${statusNote}` : ""}
             </p>
           </div>
         </div>
@@ -191,8 +321,13 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
                 className={syncing ? "animate-spin" : undefined}
               />
             }
-            onClick={handleSync}
+            onClick={() => handleSync(false)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              void handleSync(true);
+            }}
             disabled={syncing}
+            title="Sync new runs. Right-click for a full rebuild."
           >
             {syncing ? "Syncing…" : "Sync"}
           </NeuButton>
@@ -253,4 +388,18 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
       </div>
     </div>
   );
+}
+
+function newestCursor(activities: RunActivity[]) {
+  if (!activities.length) return null;
+  let newest = activities[0].startDate;
+  let newestTs = Date.parse(newest);
+  for (const activity of activities) {
+    const ts = Date.parse(activity.startDate);
+    if (Number.isFinite(ts) && ts > newestTs) {
+      newestTs = ts;
+      newest = activity.startDate;
+    }
+  }
+  return newest;
 }

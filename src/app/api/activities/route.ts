@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sinceToAfterEpoch } from "@/lib/merge-runs";
 import { getSession } from "@/lib/session";
 import { ensureAccessToken } from "@/lib/strava/ensure-token";
 import {
-  getCachedRunActivities,
   getDemoRunsPayload,
+  getFullRunActivities,
+  getIncrementalRunActivities,
 } from "@/lib/strava/runs-server-cache";
 
 export async function GET(request: NextRequest) {
@@ -15,6 +17,12 @@ export async function GET(request: NextRequest) {
   const refresh =
     request.nextUrl.searchParams.get("refresh") === "1" ||
     request.nextUrl.searchParams.get("refresh") === "true";
+  const modeParam = request.nextUrl.searchParams.get("mode");
+  const since = request.nextUrl.searchParams.get("since");
+  const wantIncremental =
+    !refresh &&
+    modeParam !== "full" &&
+    (modeParam === "incremental" || Boolean(since));
 
   if (auth.isDemo) {
     const payload = getDemoRunsPayload();
@@ -23,6 +31,7 @@ export async function GET(request: NextRequest) {
         activities: payload.activities,
         syncedAt: payload.syncedAt,
         source: payload.source,
+        mode: "full",
         isDemo: true,
         cached: true,
       },
@@ -35,6 +44,37 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (wantIncremental && since) {
+      const after = sinceToAfterEpoch(since);
+      if (typeof after !== "number") {
+        return NextResponse.json(
+          { error: "Invalid since timestamp" },
+          { status: 400 },
+        );
+      }
+
+      const payload = await getIncrementalRunActivities({
+        accessToken: auth.athlete.accessToken,
+        after,
+      });
+
+      return NextResponse.json(
+        {
+          activities: payload.activities,
+          syncedAt: payload.syncedAt,
+          source: payload.source,
+          mode: "incremental",
+          isDemo: false,
+          cached: false,
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+
     const session = await getSession();
     let cacheEpoch = session.runsCacheEpoch ?? 0;
 
@@ -44,7 +84,8 @@ export async function GET(request: NextRequest) {
       await session.save();
     }
 
-    const payload = await getCachedRunActivities({
+    // New epoch on refresh ⇒ cache miss ⇒ one Strava crawl, then stored.
+    const payload = await getFullRunActivities({
       athleteId: auth.athlete.id,
       accessToken: auth.athlete.accessToken,
       cacheEpoch,
@@ -55,8 +96,9 @@ export async function GET(request: NextRequest) {
         activities: payload.activities,
         syncedAt: payload.syncedAt,
         source: refresh ? "network" : payload.source,
+        mode: "full",
         isDemo: false,
-        cached: !refresh,
+        cached: !refresh && payload.source === "server-cache",
       },
       {
         headers: {

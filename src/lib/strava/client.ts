@@ -266,12 +266,16 @@ export async function fetchRunActivities(
     maxRuns?: number;
     /** Max photo detail fetches (keeps us under Strava rate limits). */
     maxPhotoFetches?: number;
+    /** Unix seconds — only activities after this time (Strava `after`). */
+    after?: number;
   },
 ): Promise<RunActivity[]> {
   const perPage = Math.min(options?.perPage ?? 200, 200);
-  const maxPages = options?.maxPages ?? 20;
-  const maxRuns = options?.maxRuns ?? 2000;
-  const maxPhotoFetches = options?.maxPhotoFetches ?? 60;
+  const isIncremental = typeof options?.after === "number";
+  const maxPages = options?.maxPages ?? (isIncremental ? 5 : 20);
+  const maxRuns = options?.maxRuns ?? (isIncremental ? 400 : 2000);
+  const maxPhotoFetches =
+    options?.maxPhotoFetches ?? (isIncremental ? 80 : 60);
 
   const runSummaries: StravaActivity[] = [];
 
@@ -280,6 +284,9 @@ export async function fetchRunActivities(
       page: String(page),
       per_page: String(perPage),
     });
+    if (typeof options?.after === "number") {
+      params.set("after", String(options.after));
+    }
 
     const batch = await stravaFetch<StravaActivity[]>(
       `/athlete/activities?${params.toString()}`,

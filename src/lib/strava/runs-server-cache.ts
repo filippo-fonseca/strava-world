@@ -6,20 +6,20 @@ import type { RunActivity } from "@/lib/types";
 export type RunsPayload = {
   activities: RunActivity[];
   syncedAt: string;
-  source: "server-cache" | "demo";
+  source: "server-cache" | "network" | "demo";
+  mode: "full" | "incremental";
 };
 
-/** Server cache TTL — client IndexedDB also uses 6 hours. */
+/** Server cache TTL for full snapshots. */
 export const RUNS_SERVER_REVALIDATE_SECONDS = 60 * 60 * 6;
 
-export async function getCachedRunActivities(options: {
+export async function getFullRunActivities(options: {
   athleteId: number;
   accessToken: string;
   cacheEpoch: number;
 }): Promise<RunsPayload> {
   const { athleteId, accessToken, cacheEpoch } = options;
 
-  // cacheEpoch rotates on manual Sync so the next read is a cold miss.
   const readCache = unstable_cache(
     async () => {
       const activities = await fetchRunActivities(accessToken);
@@ -28,7 +28,7 @@ export async function getCachedRunActivities(options: {
         syncedAt: new Date().toISOString(),
       };
     },
-    ["strava-runs-v1", String(athleteId), String(cacheEpoch)],
+    ["strava-runs-v2", String(athleteId), String(cacheEpoch)],
     {
       revalidate: RUNS_SERVER_REVALIDATE_SECONDS,
       tags: [`strava-runs-${athleteId}`],
@@ -36,7 +36,26 @@ export async function getCachedRunActivities(options: {
   );
 
   const cached = await readCache();
-  return { ...cached, source: "server-cache" };
+  return { ...cached, source: "server-cache", mode: "full" };
+}
+
+export async function getIncrementalRunActivities(options: {
+  accessToken: string;
+  after: number;
+}): Promise<RunsPayload> {
+  const activities = await fetchRunActivities(options.accessToken, {
+    after: options.after,
+    maxPages: 5,
+    maxRuns: 400,
+    maxPhotoFetches: 80,
+  });
+
+  return {
+    activities,
+    syncedAt: new Date().toISOString(),
+    source: "network",
+    mode: "incremental",
+  };
 }
 
 export function getDemoRunsPayload(): RunsPayload {
@@ -44,5 +63,6 @@ export function getDemoRunsPayload(): RunsPayload {
     activities: getDemoActivities(),
     syncedAt: new Date().toISOString(),
     source: "demo",
+    mode: "full",
   };
 }

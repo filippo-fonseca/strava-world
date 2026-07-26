@@ -37,11 +37,24 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
     [activities],
   );
 
+  const didFitRef = useRef(false);
+  const activitiesCountRef = useRef(0);
+
   useEffect(() => {
     const map = mapRef.current;
     const bounds = boundsFromActivities(activities);
-    if (!map || !bounds) return;
-    map.fitBounds(bounds, { padding: 80, duration: 1200, maxZoom: 11 });
+    if (!map || !bounds || activities.length === 0) return;
+
+    // Fit on first data load, or when the atlas grows a lot (new region).
+    const grewALot =
+      activities.length >= activitiesCountRef.current + 5 ||
+      activitiesCountRef.current === 0;
+    activitiesCountRef.current = activities.length;
+
+    if (!didFitRef.current || grewALot) {
+      didFitRef.current = true;
+      map.fitBounds(bounds, { padding: 80, duration: 1200, maxZoom: 11 });
+    }
   }, [activities]);
 
   const handleClick = (event: MapLayerMouseEvent) => {
