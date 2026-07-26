@@ -56,13 +56,13 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
   };
 
   return (
-    <div className="neu-concave relative h-full min-h-[520px] overflow-hidden rounded-[32px] p-2 md:p-3">
-      <div className="relative h-full overflow-hidden rounded-[26px] bg-[var(--map-frame)]">
+    <div className="neu-concave relative h-[min(72vh,760px)] min-h-[520px] w-full overflow-hidden rounded-[32px] p-2 md:h-full md:p-3">
+      <div className="absolute inset-2 overflow-hidden rounded-[26px] bg-[var(--map-frame)] md:inset-3">
         <Map
           ref={mapRef}
           initialViewState={{ longitude: 10, latitude: 25, zoom: 1.5 }}
           mapStyle={MAP_STYLE}
-          style={{ width: "100%", height: "100%" }}
+          style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }}
           attributionControl={{ compact: true }}
           interactiveLayerIds={mode === "routes" ? ["run-routes-hit"] : []}
           onClick={handleClick}

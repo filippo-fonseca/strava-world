@@ -129,8 +129,12 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
           )}
         </div>
 
-        <div className="relative order-1 min-h-[520px] lg:order-2">
-          {!loading && !error && (
+        <div className="relative order-1 min-h-[520px] lg:order-2 lg:min-h-0 lg:h-full">
+          {loading || error ? (
+            <div className="neu-concave flex h-[min(72vh,760px)] min-h-[520px] items-center justify-center rounded-[32px] text-[var(--neu-muted)] md:h-full">
+              {error || "Plotting your world…"}
+            </div>
+          ) : (
             <WorldMap
               activities={filtered}
               mode={mode}
