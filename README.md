@@ -4,7 +4,7 @@ A soft, neumorphic atlas of your running life.
 
 Connect Strava (or explore the demo) and see where you’ve run on a world map — **heatmap**, **routes**, and **photo memories**, with gentle dashed markers when a run has no photos.
 
-<p align="center">
+<p align="center"> 
   <img alt="Strava World" src="public/og-preview.svg" width="720" />
 </p>
 
