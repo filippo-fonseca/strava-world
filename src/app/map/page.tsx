@@ -9,8 +9,14 @@ export default async function MapPage() {
     redirect("/");
   }
 
-  const { accessToken: _a, refreshToken: _r, expiresAt: _e, ...athlete } =
-    session.athlete;
+  const athlete = {
+    id: session.athlete.id,
+    firstname: session.athlete.firstname,
+    lastname: session.athlete.lastname,
+    profile: session.athlete.profile,
+    city: session.athlete.city,
+    country: session.athlete.country,
+  };
 
   return (
     <MapExplorer
