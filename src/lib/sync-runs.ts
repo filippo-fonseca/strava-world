@@ -4,6 +4,7 @@ import {
   mergeRunActivities,
   newestActivityStart,
 } from "@/lib/merge-runs";
+import { hydrateActivities } from "@/lib/geo";
 import {
   RUNS_CACHE_SCHEMA_VERSION,
   RUNS_FULL_REBUILD_MAX_AGE_MS,
@@ -93,19 +94,21 @@ export async function applySyncResponse(options: {
           updated: 0,
         };
 
+  const activities = hydrateActivities(merged.activities);
+
   const payload: CachedRuns = {
     athleteId: athleteCacheId(options.athleteId, options.isDemo),
     isDemo: options.isDemo,
     syncedAt,
-    newestStartDate: newestActivityStart(merged.activities),
+    newestStartDate: newestActivityStart(activities),
     schemaVersion: RUNS_CACHE_SCHEMA_VERSION,
-    activities: merged.activities,
+    activities,
   };
 
   await writeRunsCache(payload);
 
   return {
-    activities: merged.activities,
+    activities,
     syncedAt,
     mode,
     added: merged.added,

@@ -11,6 +11,7 @@ import {
   readRunsCache,
   RUNS_CACHE_MAX_AGE_MS,
 } from "@/lib/runs-cache";
+import { hydrateActivities } from "@/lib/geo";
 import {
   applySyncResponse,
   fetchActivitiesFromApi,
@@ -151,7 +152,8 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
       if (cancelled) return;
 
       if (cached?.activities?.length) {
-        commitResult(cached.activities, cached.syncedAt, null);
+        const hydrated = hydrateActivities(cached.activities);
+        commitResult(hydrated, cached.syncedAt, null);
         setLoading(false);
 
         if (shouldFullRebuild(cached.syncedAt)) {
@@ -367,6 +369,14 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
               selectedId={selected?.id}
               onSelect={setSelected}
             />
+          )}
+          {!showInitialLoading && activities.length > 0 && (
+            <p className="px-1 text-xs text-[var(--neu-muted)]">
+              Tip: switch to <span className="font-medium">Routes</span> or{" "}
+              <span className="font-medium">Photos</span> if Heat looks sparse.
+              Right-click <span className="font-medium">Sync</span> to fully
+              rebuild from Strava.
+            </p>
           )}
         </div>
 
