@@ -19,7 +19,7 @@ import {
   syncCursorFromCache,
   type SyncMode,
 } from "@/lib/sync-runs";
-import { WorldMap } from "@/components/map/WorldMap";
+import { WorldMapDynamic as WorldMap } from "@/components/map/WorldMapDynamic";
 import { ModeToggle } from "@/components/map/ModeToggle";
 import { ActivityList } from "@/components/map/ActivityList";
 import { ActivityDrawer } from "@/components/map/ActivityDrawer";
@@ -40,7 +40,7 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
-  const [mode, setMode] = useState<MapMode>("heatmap");
+  const [mode, setMode] = useState<MapMode>("routes");
   const [selected, setSelected] = useState<RunActivity | null>(null);
   const [query, setQuery] = useState("");
   const [, startTransition] = useTransition();
