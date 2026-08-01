@@ -1,26 +1,32 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { MapMode, RunActivity } from "@/lib/types";
+import type { MapLayers, RunActivity } from "@/lib/types";
+
+function MapSkeleton() {
+  return (
+    <div
+      className="surface flex w-full flex-col justify-end p-2"
+      style={{ height: "min(62vh, 680px)", minHeight: 280 }}
+      aria-busy="true"
+      aria-label="Loading map"
+    >
+      <div className="skeleton h-full min-h-[260px] w-full rounded-[10px]" />
+    </div>
+  );
+}
 
 const WorldMapInner = dynamic(
   () => import("@/components/map/WorldMap").then((mod) => mod.WorldMap),
   {
     ssr: false,
-    loading: () => (
-      <div
-        className="neu-convex flex w-full items-center justify-center rounded-[32px] text-[var(--neu-muted)]"
-        style={{ height: "min(70vh, 640px)", minHeight: 480 }}
-      >
-        Loading map…
-      </div>
-    ),
+    loading: () => <MapSkeleton />,
   },
 );
 
 type Props = {
   activities: RunActivity[];
-  mode: MapMode;
+  layers: MapLayers;
   selectedId?: number | null;
   onSelect: (activity: RunActivity | null) => void;
 };
@@ -28,3 +34,5 @@ type Props = {
 export function WorldMapDynamic(props: Props) {
   return <WorldMapInner {...props} />;
 }
+
+export { MapSkeleton };

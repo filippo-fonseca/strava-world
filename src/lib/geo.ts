@@ -76,7 +76,7 @@ export function activitiesToHeatCollection(
       return [
         {
           type: "Feature" as const,
-          properties: { id: activity.id },
+          properties: { id: activity.id, weight: 1 },
           geometry: {
             type: "Point" as const,
             coordinates: [lng, lat],
@@ -85,12 +85,14 @@ export function activitiesToHeatCollection(
       ];
     }
 
-    const step = Math.max(1, Math.floor(stream.length / 120));
+    // Denser sampling so overlapping "common segments" glow hotter.
+    const target = Math.min(240, Math.max(40, stream.length));
+    const step = Math.max(1, Math.floor(stream.length / target));
     return stream
       .filter((_, index) => index % step === 0)
       .map(([lat, lng]) => ({
         type: "Feature" as const,
-        properties: { id: activity.id },
+        properties: { id: activity.id, weight: 1 },
         geometry: {
           type: "Point" as const,
           coordinates: [lng, lat],
@@ -99,6 +101,59 @@ export function activitiesToHeatCollection(
   });
 
   return { type: "FeatureCollection", features };
+}
+
+/** Grid-sample markers so world zoom stays readable but every cell can show a pin/photo. */
+export function selectMarkersForZoom(
+  activities: RunActivity[],
+  zoom: number,
+): RunActivity[] {
+  const mappable = activities.filter((a) => activityCenter(a));
+  if (!mappable.length) return [];
+
+  if (zoom >= 10) return mappable;
+  if (zoom >= 7) {
+    return sampleByGrid(mappable, zoom >= 8.5 ? 0.35 : 0.8, 180);
+  }
+  if (zoom >= 4) {
+    return sampleByGrid(mappable, zoom >= 5.5 ? 2.5 : 5, 100);
+  }
+  return sampleByGrid(mappable, 12, 56);
+}
+
+function sampleByGrid(
+  activities: RunActivity[],
+  cellDeg: number,
+  maxCount: number,
+): RunActivity[] {
+  const buckets = new Map<string, RunActivity[]>();
+
+  for (const activity of activities) {
+    const center = activityCenter(activity);
+    if (!center) continue;
+    const [lat, lng] = center;
+    const key = `${Math.floor(lat / cellDeg)}:${Math.floor(lng / cellDeg)}`;
+    const list = buckets.get(key);
+    if (list) list.push(activity);
+    else buckets.set(key, [activity]);
+  }
+
+  const picked: RunActivity[] = [];
+  for (const list of buckets.values()) {
+    // Prefer photo runs in each cell, then most recent.
+    list.sort((a, b) => {
+      const photoDelta = (b.totalPhotoCount > 0 ? 1 : 0) - (a.totalPhotoCount > 0 ? 1 : 0);
+      if (photoDelta !== 0) return photoDelta;
+      return Date.parse(b.startDate) - Date.parse(a.startDate);
+    });
+    picked.push(list[0]);
+    if (list.length > 2 && picked.length < maxCount) {
+      picked.push(list[1]);
+    }
+  }
+
+  picked.sort((a, b) => Date.parse(b.startDate) - Date.parse(a.startDate));
+  return picked.slice(0, maxCount);
 }
 
 export function activityCenter(activity: RunActivity): LatLng | null {

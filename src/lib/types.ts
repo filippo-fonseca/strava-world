@@ -41,6 +41,20 @@ export type AthleteSummary = {
   country?: string | null;
 };
 
+/** Optional layer visibility overrides — default is all on. */
+export type MapLayers = {
+  heat: boolean;
+  routes: boolean;
+  photos: boolean;
+};
+
+export const DEFAULT_MAP_LAYERS: MapLayers = {
+  heat: true,
+  routes: true,
+  photos: true,
+};
+
+/** @deprecated Prefer MapLayers — kept for transitional imports. */
 export type MapMode = "heatmap" | "routes" | "photos";
 
 export type SessionAthlete = AthleteSummary & {
