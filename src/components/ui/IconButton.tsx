@@ -9,7 +9,7 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
 };
 
-export function NeuIconButton({
+export function IconButton({
   label,
   active,
   className,
@@ -21,8 +21,8 @@ export function NeuIconButton({
       aria-label={label}
       title={label}
       className={clsx(
-        "neu-pressable grid h-11 w-11 place-items-center rounded-2xl",
-        active ? "neu-concave text-[var(--neu-accent)]" : "neu-convex text-[var(--neu-ink)]",
+        "pressable grid h-11 w-11 place-items-center rounded-[10px] border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]",
+        active && "border-[var(--accent)] text-[var(--accent)]",
         className,
       )}
       {...props}

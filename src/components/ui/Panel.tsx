@@ -7,7 +7,7 @@ type Props = HTMLAttributes<HTMLDivElement> & {
   action?: ReactNode;
 };
 
-export function NeuPanel({
+export function Panel({
   className,
   inset = false,
   title,
@@ -18,8 +18,8 @@ export function NeuPanel({
   return (
     <div
       className={clsx(
-        "rounded-[28px] p-4 md:p-5",
-        inset ? "neu-concave" : "neu-convex",
+        "p-4 md:p-5",
+        inset ? "surface-inset" : "surface",
         className,
       )}
       {...props}
@@ -27,7 +27,7 @@ export function NeuPanel({
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between gap-3">
           {title ? (
-            <h3 className="font-[family-name:var(--font-display)] text-lg tracking-tight text-[var(--neu-ink)]">
+            <h3 className="font-[family-name:var(--font-display)] text-lg tracking-tight text-[var(--ink)]">
               {title}
             </h3>
           ) : (
