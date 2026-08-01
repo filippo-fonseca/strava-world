@@ -309,11 +309,32 @@ export function WorldMap({ activities, layers, selectedId, onSelect }: Props) {
                   "#7c2d12",
                   "#c2410c",
                 ],
+                // Zoom must be the outer expression — nesting interpolate inside case fails.
                 "line-width": [
-                  "case",
-                  ["==", ["get", "id"], selectedId ?? -1],
-                  ["interpolate", ["linear"], ["zoom"], 2, 1.5, 8, 3.5, 14, 5.5],
-                  ["interpolate", ["linear"], ["zoom"], 2, 0.8, 8, 2.2, 14, 3.5],
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  2,
+                  [
+                    "case",
+                    ["==", ["get", "id"], selectedId ?? -1],
+                    1.5,
+                    0.8,
+                  ],
+                  8,
+                  [
+                    "case",
+                    ["==", ["get", "id"], selectedId ?? -1],
+                    3.5,
+                    2.2,
+                  ],
+                  14,
+                  [
+                    "case",
+                    ["==", ["get", "id"], selectedId ?? -1],
+                    5.5,
+                    3.5,
+                  ],
                 ],
                 "line-opacity": [
                   "interpolate",
