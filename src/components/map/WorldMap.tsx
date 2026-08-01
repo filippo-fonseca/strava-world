@@ -11,12 +11,13 @@ import maplibregl, {
   type MapLayerMouseEvent,
   type StyleSpecification,
 } from "maplibre-gl";
-import type { MapMode, RunActivity } from "@/lib/types";
+import type { MapLayers, RunActivity } from "@/lib/types";
 import {
   activitiesToHeatCollection,
   activitiesToRouteCollection,
   boundsFromActivities,
   countMappableActivities,
+  selectMarkersForZoom,
 } from "@/lib/geo";
 import { PhotoMarker } from "@/components/map/PhotoMarker";
 
@@ -52,16 +53,17 @@ const RASTER_STYLE: StyleSpecification = {
 
 type Props = {
   activities: RunActivity[];
-  mode: MapMode;
+  layers: MapLayers;
   selectedId?: number | null;
   onSelect: (activity: RunActivity | null) => void;
 };
 
-export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
+export function WorldMap({ activities, layers, selectedId, onSelect }: Props) {
   const mapRef = useRef<MapRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fittedRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
-  const [mapSize, setMapSize] = useState({ w: 0, h: 0 });
+  const [zoom, setZoom] = useState(1.5);
   const [error, setError] = useState<string | null>(null);
 
   const routes = useMemo(
@@ -77,49 +79,55 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
     [activities],
   );
 
-  const markerActivities = useMemo(() => {
-    if (mode === "photos") return activities.slice(0, 120);
-    if (mode === "routes") return activities.slice(0, 60);
-    // Heat: a light sprinkling of markers so the map never looks empty.
-    return activities.filter((a) => a.totalPhotoCount > 0).slice(0, 40);
-  }, [activities, mode]);
+  const markerActivities = useMemo(
+    () => selectMarkersForZoom(activities, zoom),
+    [activities, zoom],
+  );
 
-  const resizeAndFit = useCallback(() => {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
+  const markerSize = zoom >= 9 ? "lg" : zoom >= 5 ? "md" : "sm";
 
-    map.resize();
+  const resizeAndFit = useCallback(
+    (force = false) => {
+      const map = mapRef.current?.getMap();
+      if (!map) return;
 
-    const bounds = boundsFromActivities(activities);
-    if (!bounds) return;
+      map.resize();
 
-    try {
-      map.fitBounds(bounds, {
-        padding: 64,
-        duration: 800,
-        maxZoom: 13,
-        essential: true,
-      });
-    } catch (err) {
-      console.warn("fitBounds failed", err);
-    }
-  }, [activities]);
+      if (fittedRef.current && !force) return;
+
+      const bounds = boundsFromActivities(activities);
+      if (!bounds) return;
+
+      try {
+        map.fitBounds(bounds, {
+          padding: 56,
+          duration: force || !fittedRef.current ? 800 : 0,
+          maxZoom: 12,
+          essential: true,
+        });
+        fittedRef.current = true;
+      } catch (err) {
+        console.warn("fitBounds failed", err);
+      }
+    },
+    [activities],
+  );
 
   useEffect(() => {
     if (!mapReady) return;
-    const id = window.setTimeout(() => resizeAndFit(), 80);
+    const id = window.setTimeout(() => resizeAndFit(false), 80);
     return () => window.clearTimeout(id);
-  }, [mapReady, resizeAndFit, activities.length, mode]);
+  }, [mapReady, resizeAndFit, activities.length]);
+
+  useEffect(() => {
+    fittedRef.current = false;
+  }, [activities.length]);
 
   useEffect(() => {
     const node = containerRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;
 
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const { width, height } = entry.contentRect;
-      setMapSize({ w: Math.round(width), h: Math.round(height) });
+    const observer = new ResizeObserver(() => {
       mapRef.current?.getMap()?.resize();
     });
 
@@ -139,11 +147,11 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
   };
 
   return (
-    <div className="neu-convex relative w-full overflow-hidden rounded-[32px] p-2 md:p-3">
+    <div className="surface relative w-full overflow-hidden p-1.5 sm:p-2">
       <div
         ref={containerRef}
-        className="relative w-full overflow-hidden rounded-[26px] bg-[#cfe0ea]"
-        style={{ height: "min(70vh, 640px)", minHeight: 480 }}
+        className="relative w-full overflow-hidden rounded-[10px] bg-[#d7e4ec]"
+        style={{ height: "min(58vh, 680px)", minHeight: 320 }}
       >
         <Map
           ref={mapRef}
@@ -153,18 +161,33 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
           style={{ width: "100%", height: "100%" }}
           attributionControl={{ compact: true }}
           interactiveLayerIds={
-            mode === "routes" ? ["run-routes-hit", "run-routes-line"] : []
+            layers.routes ? ["run-routes-hit", "run-routes-line"] : []
           }
           onClick={handleClick}
-          cursor={mode === "routes" ? "pointer" : "grab"}
+          cursor={layers.routes ? "pointer" : "grab"}
           onLoad={() => {
             setMapReady(true);
             setError(null);
-            requestAnimationFrame(() => resizeAndFit());
+            const map = mapRef.current?.getMap();
+            if (map) setZoom(map.getZoom());
+            requestAnimationFrame(() => resizeAndFit(true));
           }}
+          onMoveEnd={(e) => setZoom(e.viewState.zoom)}
+          onZoomEnd={(e) => setZoom(e.viewState.zoom)}
           onError={(e) => {
+            const message =
+              (e.error && "message" in e.error
+                ? String((e.error as { message?: string }).message)
+                : "") || String(e.error ?? "");
+            // Single tile failures / aborts are common; only banner style-level failures.
+            if (
+              /abort|cancel|Failed to fetch|AJAXError|tile/i.test(message)
+            ) {
+              console.warn("MapLibre tile warning", message);
+              return;
+            }
             console.error("MapLibre error", e);
-            setError("Map failed to load basemap tiles");
+            setError("Map failed to load basemap");
           }}
         >
           <NavigationControl position="bottom-right" showCompass={false} />
@@ -174,19 +197,21 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
               id="run-heat-layer"
               type="heatmap"
               layout={{
-                visibility: mode === "heatmap" ? "visible" : "none",
+                visibility: layers.heat ? "visible" : "none",
               }}
               paint={{
-                "heatmap-weight": 1,
+                "heatmap-weight": ["coalesce", ["get", "weight"], 1],
                 "heatmap-intensity": [
                   "interpolate",
                   ["linear"],
                   ["zoom"],
                   0,
-                  0.8,
-                  5,
-                  1.3,
-                  10,
+                  0.7,
+                  4,
+                  1.1,
+                  8,
+                  1.5,
+                  12,
                   1.8,
                 ],
                 "heatmap-radius": [
@@ -194,27 +219,41 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
                   ["linear"],
                   ["zoom"],
                   0,
-                  10,
-                  5,
-                  22,
-                  10,
-                  36,
+                  8,
+                  4,
+                  16,
+                  8,
+                  28,
+                  12,
+                  40,
                 ],
-                "heatmap-opacity": 0.85,
+                "heatmap-opacity": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  0,
+                  0.95,
+                  5,
+                  0.85,
+                  9,
+                  0.55,
+                  13,
+                  0.25,
+                ],
                 "heatmap-color": [
                   "interpolate",
                   ["linear"],
                   ["heatmap-density"],
                   0,
-                  "rgba(228,87,46,0)",
+                  "rgba(194,65,12,0)",
                   0.2,
-                  "rgba(243,181,154,0.7)",
-                  0.5,
-                  "rgba(228,87,46,0.85)",
-                  0.8,
-                  "rgba(176,48,16,0.95)",
+                  "rgba(251,146,60,0.55)",
+                  0.45,
+                  "rgba(234,88,12,0.8)",
+                  0.75,
+                  "rgba(194,65,12,0.92)",
                   1,
-                  "rgba(90,24,8,1)",
+                  "rgba(124,45,18,1)",
                 ],
               }}
             />
@@ -227,13 +266,32 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
               layout={{
                 "line-cap": "round",
                 "line-join": "round",
-                visibility:
-                  mode === "routes" || mode === "heatmap" ? "visible" : "none",
+                visibility: layers.routes ? "visible" : "none",
               }}
               paint={{
                 "line-color": "#ffffff",
-                "line-width": mode === "heatmap" ? 4 : 7,
-                "line-opacity": mode === "heatmap" ? 0.4 : 0.75,
+                "line-width": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  2,
+                  1.5,
+                  8,
+                  4,
+                  14,
+                  7,
+                ],
+                "line-opacity": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  2,
+                  0.15,
+                  6,
+                  0.45,
+                  11,
+                  0.75,
+                ],
               }}
             />
             <Layer
@@ -242,30 +300,62 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
               layout={{
                 "line-cap": "round",
                 "line-join": "round",
-                visibility:
-                  mode === "heatmap" || mode === "routes" ? "visible" : "none",
+                visibility: layers.routes ? "visible" : "none",
               }}
               paint={{
                 "line-color": [
                   "case",
                   ["==", ["get", "id"], selectedId ?? -1],
-                  "#b03010",
-                  "#e4572e",
+                  "#7c2d12",
+                  "#c2410c",
                 ],
+                // Zoom must be the outer expression — nesting interpolate inside case fails.
                 "line-width": [
-                  "case",
-                  ["==", ["get", "id"], selectedId ?? -1],
-                  mode === "heatmap" ? 3.5 : 5,
-                  mode === "heatmap" ? 2.25 : 3.5,
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  2,
+                  [
+                    "case",
+                    ["==", ["get", "id"], selectedId ?? -1],
+                    1.5,
+                    0.8,
+                  ],
+                  8,
+                  [
+                    "case",
+                    ["==", ["get", "id"], selectedId ?? -1],
+                    3.5,
+                    2.2,
+                  ],
+                  14,
+                  [
+                    "case",
+                    ["==", ["get", "id"], selectedId ?? -1],
+                    5.5,
+                    3.5,
+                  ],
                 ],
-                "line-opacity": mode === "heatmap" ? 0.8 : 0.95,
+                "line-opacity": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  2,
+                  0.25,
+                  5,
+                  0.55,
+                  9,
+                  0.9,
+                  14,
+                  0.95,
+                ],
               }}
             />
             <Layer
               id="run-routes-hit"
               type="line"
               layout={{
-                visibility: mode === "routes" ? "visible" : "none",
+                visibility: layers.routes ? "visible" : "none",
               }}
               paint={{
                 "line-color": "#000000",
@@ -280,26 +370,22 @@ export function WorldMap({ activities, mode, selectedId, onSelect }: Props) {
               key={activity.id}
               activity={activity}
               selected={selectedId === activity.id}
+              size={markerSize}
+              showPhoto={layers.photos}
               onSelect={onSelect}
             />
           ))}
         </Map>
 
-        <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-full bg-[rgba(44,41,36,0.75)] px-3 py-1 text-[11px] font-medium text-white backdrop-blur">
-          {mappableCount}/{activities.length} GPS · {routes.features.length}{" "}
-          routes · {heat.features.length} heat pts
-          {mapSize.w ? ` · ${mapSize.w}×${mapSize.h}` : ""}
-        </div>
-
         {mappableCount === 0 && activities.length > 0 && (
-          <div className="absolute inset-x-4 bottom-4 z-10 rounded-2xl bg-[rgba(44,41,36,0.85)] px-4 py-3 text-sm text-white">
-            Runs loaded, but none include GPS polylines. Right-click{" "}
+          <div className="absolute inset-x-3 bottom-3 z-10 rounded-[10px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--ink)] sm:inset-x-4">
+            Runs loaded, but none include GPS. Right-click{" "}
             <strong>Sync</strong> to rebuild from Strava.
           </div>
         )}
 
         {error && (
-          <div className="absolute inset-x-4 top-12 z-10 rounded-2xl bg-[rgba(176,48,16,0.92)] px-4 py-3 text-sm text-white">
+          <div className="absolute inset-x-3 top-3 z-10 rounded-[10px] border border-[var(--accent)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--accent)] sm:inset-x-4">
             {error}. Allow basemaps.cartocdn.com if you use an ad blocker.
           </div>
         )}

@@ -1,38 +1,41 @@
 "use client";
 
-import { Camera, Flame, Route } from "lucide-react";
 import clsx from "clsx";
-import type { MapMode } from "@/lib/types";
+import type { MapLayers } from "@/lib/types";
 
-const modes: Array<{ id: MapMode; label: string; icon: typeof Flame }> = [
-  { id: "heatmap", label: "Heat", icon: Flame },
-  { id: "routes", label: "Routes", icon: Route },
-  { id: "photos", label: "Photos", icon: Camera },
+const layers: Array<{ id: keyof MapLayers; label: string }> = [
+  { id: "heat", label: "Heat" },
+  { id: "routes", label: "Routes" },
+  { id: "photos", label: "Photos" },
 ];
 
 type Props = {
-  value: MapMode;
-  onChange: (mode: MapMode) => void;
+  value: MapLayers;
+  onChange: (next: MapLayers) => void;
 };
 
 export function ModeToggle({ value, onChange }: Props) {
   return (
-    <div className="neu-concave inline-flex gap-1 rounded-2xl p-1">
-      {modes.map(({ id, label, icon: Icon }) => {
-        const active = value === id;
+    <div
+      className="inline-flex max-w-full flex-wrap gap-1 rounded-[10px] border border-[var(--line)] bg-[var(--surface)] p-1"
+      role="group"
+      aria-label="Map layers"
+    >
+      {layers.map(({ id, label }) => {
+        const active = value[id];
         return (
           <button
             key={id}
             type="button"
-            onClick={() => onChange(id)}
+            aria-pressed={active}
+            onClick={() => onChange({ ...value, [id]: !active })}
             className={clsx(
-              "neu-pressable inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium",
+              "pressable min-h-9 rounded-[8px] px-3 py-1.5 text-sm font-medium",
               active
-                ? "neu-convex text-[var(--neu-accent)]"
-                : "text-[var(--neu-muted)] shadow-none",
+                ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                : "text-[var(--muted)] hover:text-[var(--ink)]",
             )}
           >
-            <Icon size={15} />
             {label}
           </button>
         );

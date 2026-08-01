@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { LogOut, RefreshCw, Sparkles } from "lucide-react";
+import { LogOut, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { AthleteSummary, MapMode, RunActivity } from "@/lib/types";
+import type { AthleteSummary, MapLayers, RunActivity } from "@/lib/types";
+import { DEFAULT_MAP_LAYERS } from "@/lib/types";
 import {
   clearRunsCache,
   formatSyncedAt,
@@ -24,8 +25,8 @@ import { ModeToggle } from "@/components/map/ModeToggle";
 import { ActivityList } from "@/components/map/ActivityList";
 import { ActivityDrawer } from "@/components/map/ActivityDrawer";
 import { StatsBar } from "@/components/map/StatsBar";
-import { NeuButton } from "@/components/ui/NeuButton";
-import { NeuPanel } from "@/components/ui/NeuPanel";
+import { Button } from "@/components/ui/Button";
+import { Panel } from "@/components/ui/Panel";
 
 type Props = {
   initialAthlete: AthleteSummary | null;
@@ -40,7 +41,7 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
-  const [mode, setMode] = useState<MapMode>("routes");
+  const [layers, setLayers] = useState<MapLayers>(DEFAULT_MAP_LAYERS);
   const [selected, setSelected] = useState<RunActivity | null>(null);
   const [query, setQuery] = useState("");
   const [, startTransition] = useTransition();
@@ -114,23 +115,20 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
               );
             }
             if (result.updated > 0) {
-              parts.push(
-                `${result.updated} updated`,
-              );
+              parts.push(`${result.updated} updated`);
             }
             note = parts.join(" · ");
           } else {
-            note = "Already up to date";
+            note = "Up to date";
           }
         } else {
-          note = `Loaded ${result.activities.length} runs`;
+          note = `${result.activities.length} runs`;
         }
 
         commitResult(result.activities, result.syncedAt, note);
         setError(null);
       } catch (err) {
         if (!cancelled) {
-          // Keep showing cached atlas if we have one.
           if (activitiesRef.current.length === 0) {
             setError(err instanceof Error ? err.message : "Failed to load");
           } else {
@@ -188,8 +186,7 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
       } else {
         void runSync({
           mode: "incremental",
-          since:
-            newestCursor(activitiesRef.current) || cursor,
+          since: newestCursor(activitiesRef.current) || cursor,
           background: true,
         });
       }
@@ -260,7 +257,7 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
                 .join(" · "),
             );
           } else {
-            setStatusNote("Already up to date");
+            setStatusNote("Up to date");
           }
         } else {
           setStatusNote(`Rebuilt ${result.activities.length} runs`);
@@ -289,80 +286,91 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
   }
 
   const showInitialLoading = loading && activities.length === 0;
+  const showMap = activities.length > 0;
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col gap-4 px-3 py-4 md:gap-5 md:px-6 md:py-6">
-      <header className="neu-convex flex flex-wrap items-center justify-between gap-3 rounded-[28px] px-4 py-3 md:px-5">
-        <div className="flex items-center gap-3">
-          <div className="neu-concave grid h-12 w-12 place-items-center rounded-2xl">
-            <Sparkles className="text-[var(--neu-accent)]" size={20} />
-          </div>
-          <div>
-            <p className="font-[family-name:var(--font-display)] text-xl tracking-tight">
-              Strava World
-            </p>
-            <p className="text-sm text-[var(--neu-muted)]">
-              {initialAthlete
-                ? `${initialAthlete.firstname} ${initialAthlete.lastname}`
-                : "Explorer"}
-              {isDemo ? " · Demo atlas" : " · Live Strava"}
-              {" · "}
-              {formatSyncedAt(syncedAt)}
-              {statusNote ? ` · ${statusNote}` : ""}
-            </p>
-          </div>
+    <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col gap-3 px-3 pb-[calc(1rem+var(--safe-bottom))] pt-3 sm:gap-4 sm:px-5 sm:py-5 md:px-6">
+      <header className="surface flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-4">
+        <div className="min-w-0">
+          <p className="font-[family-name:var(--font-display)] text-xl tracking-tight">
+            Strava World
+          </p>
+          <p className="truncate text-sm text-[var(--muted)]">
+            {initialAthlete
+              ? `${initialAthlete.firstname} ${initialAthlete.lastname}`
+              : "Explorer"}
+            {isDemo ? " · Demo" : " · Strava"}
+            {" · "}
+            {syncing ? "Updating…" : formatSyncedAt(syncedAt)}
+            {statusNote && !syncing ? ` · ${statusNote}` : ""}
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <ModeToggle value={mode} onChange={setMode} />
-          <NeuButton
-            variant="concave"
-            leftIcon={
-              <RefreshCw
-                size={15}
-                className={syncing ? "animate-spin" : undefined}
-              />
-            }
-            onClick={() => handleSync(false)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              void handleSync(true);
-            }}
-            disabled={syncing}
-            title="Sync new runs. Right-click for a full rebuild."
-          >
-            {syncing ? "Syncing…" : "Sync"}
-          </NeuButton>
-          <NeuButton
-            variant="ghost"
-            leftIcon={<LogOut size={15} />}
-            onClick={logout}
-          >
-            Sign out
-          </NeuButton>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <ModeToggle value={layers} onChange={setLayers} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              leftIcon={
+                <RefreshCw
+                  size={15}
+                  className={syncing ? "animate-spin" : undefined}
+                />
+              }
+              onClick={() => handleSync(false)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                void handleSync(true);
+              }}
+              disabled={syncing}
+              title="Sync new runs. Right-click for a full rebuild."
+            >
+              {syncing ? "Syncing…" : "Sync"}
+            </Button>
+            <Button
+              variant="ghost"
+              leftIcon={<LogOut size={15} />}
+              onClick={logout}
+            >
+              Sign out
+            </Button>
+          </div>
         </div>
       </header>
 
-      <StatsBar activities={activities} />
+      <StatsBar activities={activities} loading={showInitialLoading} />
 
-      <div className="grid min-h-[70vh] flex-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="order-2 flex min-h-[360px] flex-col gap-3 lg:order-1">
-          <NeuPanel inset className="!p-3">
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-4">
+        <div className="order-2 flex min-h-[280px] flex-col gap-3 lg:order-1 lg:min-h-0 lg:max-h-[calc(100vh-12rem)]">
+          <Panel inset className="!p-2.5">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search city, country, run…"
-              className="w-full bg-transparent px-2 py-2 text-sm outline-none placeholder:text-[var(--neu-muted)]"
+              className="w-full bg-transparent px-2 py-2 text-sm outline-none placeholder:text-[var(--muted)]"
+              aria-label="Search runs"
             />
-          </NeuPanel>
+          </Panel>
           {showInitialLoading ? (
-            <NeuPanel className="flex flex-1 items-center justify-center text-[var(--neu-muted)]">
-              Fetching your run history from Strava…
-            </NeuPanel>
+            <Panel className="flex flex-1 flex-col gap-2 !p-3">
+              <div className="skeleton h-4 w-20" />
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 py-1">
+                  <div className="skeleton h-10 w-10 shrink-0 rounded-full" />
+                  <div className="min-w-0 flex-1">
+                    <div className="skeleton mb-1.5 h-3.5 w-[75%]" />
+                    <div className="skeleton h-3 w-[50%]" />
+                  </div>
+                </div>
+              ))}
+            </Panel>
           ) : error && activities.length === 0 ? (
-            <NeuPanel className="flex flex-1 items-center justify-center text-[var(--neu-accent)]">
-              {error}
-            </NeuPanel>
+            <Panel className="flex flex-1 flex-col items-start justify-center gap-3 text-[var(--accent)]">
+              <p>{error}</p>
+              <Button variant="secondary" onClick={() => handleSync(true)}>
+                Try again
+              </Button>
+            </Panel>
           ) : (
             <ActivityList
               activities={filtered}
@@ -370,28 +378,31 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
               onSelect={setSelected}
             />
           )}
-          {!showInitialLoading && activities.length > 0 && (
-            <p className="px-1 text-xs text-[var(--neu-muted)]">
-              Tip: switch to <span className="font-medium">Routes</span> or{" "}
-              <span className="font-medium">Photos</span> if Heat looks sparse.
-              Right-click <span className="font-medium">Sync</span> to fully
-              rebuild from Strava.
-            </p>
-          )}
         </div>
 
-        <div className="relative order-1 min-h-[520px] lg:order-2 lg:min-h-0 lg:h-full">
-          {showInitialLoading || (error && activities.length === 0) ? (
-            <div className="neu-concave flex h-[min(72vh,760px)] min-h-[520px] items-center justify-center rounded-[32px] text-[var(--neu-muted)] md:h-full">
-              {error || "Plotting your world…"}
-            </div>
-          ) : (
+        <div className="relative order-1 min-h-[280px] lg:order-2 lg:min-h-0">
+          {showMap ? (
             <WorldMap
               activities={filtered}
-              mode={mode}
+              layers={layers}
               selectedId={selected?.id}
               onSelect={setSelected}
             />
+          ) : showInitialLoading ? (
+            <div
+              className="surface p-2"
+              style={{ height: "min(58vh, 680px)", minHeight: 320 }}
+            >
+              <div className="skeleton h-full min-h-[300px] w-full rounded-[10px]" />
+              <p className="sr-only">Loading your atlas…</p>
+            </div>
+          ) : (
+            <div
+              className="surface flex items-center justify-center px-4 text-center text-[var(--muted)]"
+              style={{ height: "min(58vh, 680px)", minHeight: 320 }}
+            >
+              {error || "No runs to show yet."}
+            </div>
           )}
           <ActivityDrawer activity={selected} onClose={() => setSelected(null)} />
         </div>

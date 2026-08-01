@@ -13,13 +13,13 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Strava World — neumorphic atlas of your runs",
+  title: "Strava World — a plain atlas of your runs",
   description:
-    "Open-source Next.js app that visualizes Strava runs on a beautiful world map with heatmaps, routes, and photo memories.",
+    "Open-source Next.js app that maps your Strava runs: heatmaps, routes, photo memories, and quiet statistics.",
   openGraph: {
     title: "Strava World",
     description:
-      "Visualize your Strava runs on a neumorphic world map — heatmaps, routes, and photos.",
+      "See every place you’ve run — heat, routes, photos, and stats on one map.",
     type: "website",
   },
 };
@@ -34,9 +34,7 @@ export default function RootLayout({
       lang="en"
       className={`${fraunces.variable} ${manrope.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans text-[var(--neu-ink)]">
-        {children}
-      </body>
+      <body className="min-h-full font-sans text-[var(--ink)]">{children}</body>
     </html>
   );
 }

@@ -14,7 +14,8 @@ Demo mode works without Strava credentials. For live data, add your Strava API k
 ## Guidelines
 
 - Prefer small, atomic commits with clear messages
-- Keep the neumorphic visual language consistent (warm paper tones, soft dual shadows)
+- Keep the visual language plain and quiet (warm paper, hairline borders, typography-led hierarchy — no neumorphism or decorative chrome)
+- Design for mobile widths (~375px) as well as desktop
 - Don’t commit secrets — use `.env.local`
 - Run `npm run lint` and `npm run build` before opening a PR
 
@@ -23,4 +24,4 @@ Demo mode works without Strava credentials. For live data, add your Strava API k
 - GPX export
 - Year filters / animated time scrubbing
 - Shareable public atlas links
-- Dark soft-neu theme variant
+- Optional dark theme

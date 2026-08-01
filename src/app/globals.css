@@ -2,25 +2,25 @@
 @import "maplibre-gl/dist/maplibre-gl.css";
 
 :root {
-  --neu-bg: #e8e2d8;
-  --neu-bg-deep: #ddd5c8;
-  --neu-surface: #ebe5db;
-  --neu-ink: #2c2924;
-  --neu-muted: #6f675c;
-  --neu-line: rgba(84, 72, 56, 0.12);
-  --neu-accent: #e4572e;
-  --neu-accent-soft: #f3b59a;
-  --neu-good: #3f7d5a;
-  --neu-shadow-dark: rgba(163, 149, 130, 0.55);
-  --neu-shadow-light: rgba(255, 255, 255, 0.85);
-  --map-frame: #d9d1c4;
+  --bg: #faf9f7;
+  --surface: #ffffff;
+  --ink: #1c1917;
+  --muted: #78716c;
+  --line: rgba(28, 25, 23, 0.1);
+  --line-strong: rgba(28, 25, 23, 0.16);
+  --accent: #c2410c;
+  --accent-soft: rgba(194, 65, 12, 0.12);
+  --good: #3f7d5a;
+  --radius: 10px;
+  --radius-lg: 14px;
   --font-display: var(--font-fraunces);
   --font-sans: var(--font-manrope);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @theme inline {
-  --color-background: var(--neu-bg);
-  --color-foreground: var(--neu-ink);
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
   --font-sans: var(--font-manrope);
   --font-display: var(--font-fraunces);
 }
@@ -36,17 +36,14 @@ body {
 
 body {
   margin: 0;
-  color: var(--neu-ink);
+  color: var(--ink);
   font-family: var(--font-sans), system-ui, sans-serif;
-  background:
-    radial-gradient(1200px 700px at 12% -10%, rgba(255, 255, 255, 0.55), transparent 55%),
-    radial-gradient(900px 600px at 90% 0%, rgba(228, 87, 46, 0.08), transparent 45%),
-    linear-gradient(180deg, #efe9df 0%, var(--neu-bg) 40%, #e2dacd 100%);
-  background-attachment: fixed;
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: rgba(228, 87, 46, 0.2);
+  background: var(--accent-soft);
 }
 
 a {
@@ -54,46 +51,35 @@ a {
   text-decoration: none;
 }
 
-.neu-convex {
-  background: linear-gradient(145deg, #f3eee6, #ddd5c8);
-  box-shadow:
-    10px 10px 22px var(--neu-shadow-dark),
-    -8px -8px 18px var(--neu-shadow-light);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+code {
+  font-size: 0.92em;
 }
 
-.neu-concave {
-  background: linear-gradient(145deg, #ddd5c8, #f0ebe3);
-  box-shadow:
-    inset 6px 6px 14px var(--neu-shadow-dark),
-    inset -6px -6px 14px var(--neu-shadow-light);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
 }
 
-.neu-flat {
-  background: var(--neu-surface);
-  box-shadow:
-    6px 6px 16px rgba(163, 149, 130, 0.35),
-    -4px -4px 12px rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+.surface-inset {
+  background: rgba(28, 25, 23, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
-.neu-pressable {
+.pressable {
   transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    background 180ms ease;
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
 }
 
-.neu-pressable:hover {
-  transform: translateY(-1px);
+.pressable:hover {
+  border-color: var(--line-strong);
 }
 
-.neu-pressable:active {
-  transform: translateY(1px);
-  box-shadow:
-    inset 5px 5px 12px var(--neu-shadow-dark),
-    inset -5px -5px 12px var(--neu-shadow-light);
+.pressable:active {
+  background: rgba(28, 25, 23, 0.04);
 }
 
 .maplibregl-popup-content {
@@ -111,40 +97,40 @@ a {
   font-size: 10px;
 }
 
-@keyframes float-soft {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
+.maplibregl-ctrl-group {
+  border: 1px solid var(--line) !important;
+  box-shadow: none !important;
+  border-radius: var(--radius) !important;
+  overflow: hidden;
 }
 
-@keyframes pulse-ring {
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(28, 25, 23, 0.05) 0%,
+    rgba(28, 25, 23, 0.09) 50%,
+    rgba(28, 25, 23, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius);
+}
+
+@keyframes skeleton-shimmer {
   0% {
-    transform: scale(0.85);
-    opacity: 0.7;
-  }
-  70% {
-    transform: scale(1.25);
-    opacity: 0;
+    background-position: 100% 0;
   }
   100% {
-    transform: scale(1.25);
-    opacity: 0;
+    background-position: -100% 0;
   }
 }
 
-.animate-float-soft {
-  animation: float-soft 5s ease-in-out infinite;
-}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
 
-.photo-pulse::after {
-  content: "";
-  position: absolute;
-  inset: -6px;
-  border-radius: 999px;
-  border: 1.5px solid rgba(228, 87, 46, 0.45);
-  animation: pulse-ring 2.2s ease-out infinite;
+  .pressable {
+    transition: none;
+  }
 }

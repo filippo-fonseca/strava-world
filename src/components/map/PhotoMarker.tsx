@@ -1,6 +1,5 @@
 "use client";
 
-import { ImageOff } from "lucide-react";
 import { Marker } from "react-map-gl/maplibre";
 import type { RunActivity } from "@/lib/types";
 import { activityCenter } from "@/lib/geo";
@@ -8,16 +7,32 @@ import { activityCenter } from "@/lib/geo";
 type Props = {
   activity: RunActivity;
   selected?: boolean;
+  size?: "sm" | "md" | "lg";
+  /** When false, always render a pin (hide photo preview). */
+  showPhoto?: boolean;
   onSelect: (activity: RunActivity) => void;
 };
 
-export function PhotoMarker({ activity, selected, onSelect }: Props) {
+const sizes = {
+  sm: { photo: 28, pin: 12 },
+  md: { photo: 40, pin: 14 },
+  lg: { photo: 52, pin: 16 },
+};
+
+export function PhotoMarker({
+  activity,
+  selected,
+  size = "md",
+  showPhoto = true,
+  onSelect,
+}: Props) {
   const center = activityCenter(activity);
   if (!center) return null;
 
   const [lat, lng] = center;
-  const hasPhotos = activity.totalPhotoCount > 0;
+  const hasPhotos = showPhoto && activity.totalPhotoCount > 0;
   const cover = activity.photos[0]?.url;
+  const dim = sizes[size];
 
   return (
     <Marker latitude={lat} longitude={lng} anchor="center">
@@ -28,9 +43,8 @@ export function PhotoMarker({ activity, selected, onSelect }: Props) {
           onSelect(activity);
         }}
         className={[
-          "relative grid place-items-center transition-transform duration-200",
+          "relative grid place-items-center transition-transform duration-150",
           selected ? "scale-110" : "hover:scale-105",
-          hasPhotos ? "photo-pulse" : "",
         ].join(" ")}
         aria-label={
           hasPhotos
@@ -38,14 +52,15 @@ export function PhotoMarker({ activity, selected, onSelect }: Props) {
             : `${activity.name} has no photos`
         }
       >
-        <span className="neu-convex absolute inset-[-4px] rounded-full opacity-90" />
         {hasPhotos && cover ? (
           <span
             className={[
-              "relative h-12 w-12 overflow-hidden rounded-full border-[3px]",
-              selected ? "border-[var(--neu-accent)]" : "border-white/80",
+              "relative overflow-hidden rounded-full border-2 bg-[var(--surface)] shadow-sm",
+              selected ? "border-[var(--accent)]" : "border-white",
             ].join(" ")}
             style={{
+              width: dim.photo,
+              height: dim.photo,
               backgroundImage: `url(${cover})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
@@ -54,17 +69,23 @@ export function PhotoMarker({ activity, selected, onSelect }: Props) {
         ) : (
           <span
             className={[
-              "relative grid h-11 w-11 place-items-center rounded-full border-2 border-dashed",
+              "relative block rounded-full border-2 bg-[var(--surface)]",
               selected
-                ? "border-[var(--neu-accent)] bg-[#f4ebe2] text-[var(--neu-accent)]"
-                : "border-[rgba(84,72,56,0.35)] bg-[#ebe4d8] text-[var(--neu-muted)]",
+                ? "border-[var(--accent)]"
+                : "border-[var(--line-strong)]",
             ].join(" ")}
+            style={{ width: dim.pin, height: dim.pin }}
           >
-            <ImageOff size={16} strokeWidth={2.2} />
+            <span
+              className={[
+                "absolute inset-[3px] rounded-full",
+                selected ? "bg-[var(--accent)]" : "bg-[var(--muted)]",
+              ].join(" ")}
+            />
           </span>
         )}
-        {hasPhotos && (
-          <span className="absolute -bottom-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-[var(--neu-accent)] px-1 text-[10px] font-semibold text-white shadow">
+        {hasPhotos && activity.totalPhotoCount > 1 && size !== "sm" && (
+          <span className="absolute -bottom-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--accent)] px-1 text-[9px] font-semibold text-white">
             {activity.totalPhotoCount}
           </span>
         )}

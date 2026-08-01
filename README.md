@@ -1,23 +1,24 @@
 # Strava World
 
-A soft, neumorphic atlas of your running life.
+A plain atlas of your running life.
 
-Connect Strava (or explore the demo) and see where you’ve run on a world map — **heatmap**, **routes**, and **photo memories**, with gentle dashed markers when a run has no photos.
+Connect Strava (or explore the demo) and see where you’ve run on one world map — **heat** for the paths you return to, **routes** as you zoom in, **photo previews** across the globe, and **pins** when a run has no camera roll.
 
-<p align="center"> 
+<p align="center">
   <img alt="Strava World" src="public/og-preview.svg" width="720" />
 </p>
 
 ## Features
 
 - **Strava OAuth** with secure encrypted sessions (`iron-session`)
-- **Global MapLibre map** (OpenFreeMap tiles — no Mapbox token required)
-- **Heatmap / Routes / Photos** viewing modes
-- **Run photos** pulled from Strava, pinned on the map
-- **No-photo indicators** so every run still has a place in the atlas
+- **Unified MapLibre map** (Carto Voyager tiles — no Mapbox token required)
+- **Zoom-aware layers** — heat, routes, and photos on the same map
+- **Common-path heat** — overlapping miles glow hotter
+- **Run photos** pinned as previews; **simple pins** when there are none
+- **Quiet statistics** — runs, countries, cities, distance, time, elevation, photos
 - **Smart caching / updates** — IndexedDB atlas + 6h server cache; **Sync** does incremental Strava pulls (48h overlap), full rebuild every 14 days or via right-click Sync
-- **Demo mode** with worldwide sample runs so you can try it instantly
-- **Away-inspired neumorphic UI** — soft clay surfaces, warm paper tones, quiet motion
+- **Demo mode** with worldwide sample runs
+- **Mobile-friendly** layout — stacked atlas, large tap targets, bottom activity sheet
 
 ## Quick start
 
@@ -29,7 +30,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and click **Explore demo world**.
+Open [http://localhost:3000](http://localhost:3000) and click **Explore demo**.
 
 ## Strava API setup
 
@@ -71,12 +72,12 @@ Do **not** leave `STRAVA_REDIRECT_URI` pointed at `*.vercel.app` if you sign in 
 
 ## Scripts
 
-| Command        | Description              |
-| -------------- | ------------------------ |
-| `npm run dev`  | Start local dev server   |
-| `npm run build`| Production build         |
-| `npm run start`| Serve production build   |
-| `npm run lint` | Run ESLint               |
+| Command         | Description            |
+| --------------- | ---------------------- |
+| `npm run dev`   | Start local dev server |
+| `npm run build` | Production build       |
+| `npm run start` | Serve production build |
+| `npm run lint`  | Run ESLint             |
 
 ## Project structure
 
@@ -84,11 +85,12 @@ Do **not** leave `STRAVA_REDIRECT_URI` pointed at `*.vercel.app` if you sign in 
 src/
   app/                 # Next.js App Router pages + API routes
   components/
-    landing/           # Brand home
+    landing/           # Plain home
     map/               # Atlas explorer + MapLibre layers
-    ui/                # Neumorphic primitives
+    ui/                # Quiet primitives (Button, Panel, IconButton)
   lib/
     strava/            # OAuth + API client
+    stats.ts           # Atlas statistics
     demo-data.ts       # Offline worldwide demo runs
 ```
 
@@ -110,5 +112,5 @@ MIT © Filippo Fonseca
 
 ---
 
-Built as an open-source love letter to long runs and soft interfaces.
+Built as an open-source love letter to long runs and quiet interfaces.
 Not affiliated with Strava.
