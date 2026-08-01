@@ -7,7 +7,7 @@ function MapSkeleton() {
   return (
     <div
       className="surface flex w-full flex-col justify-end p-2"
-      style={{ height: "min(62vh, 680px)", minHeight: 280 }}
+        style={{ height: "min(58vh, 680px)", minHeight: 320 }}
       aria-busy="true"
       aria-label="Loading map"
     >

@@ -21,9 +21,12 @@ export function StatsBar({ activities, loading }: Props) {
   if (loading && activities.length === 0) {
     return (
       <div className="surface overflow-hidden">
-        <div className="grid grid-cols-2 gap-px bg-[var(--line)] sm:grid-cols-4 lg:grid-cols-7">
+        <div className="-mx-0 flex gap-px overflow-x-auto bg-[var(--line)] sm:grid sm:grid-cols-4 lg:grid-cols-7">
           {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="bg-[var(--surface)] px-3 py-3 md:px-4">
+            <div
+              key={i}
+              className="min-w-[7.5rem] flex-1 bg-[var(--surface)] px-3 py-3 sm:min-w-0 md:px-4"
+            >
               <div className="skeleton mb-2 h-3 w-12" />
               <div className="skeleton h-6 w-16" />
             </div>
@@ -35,11 +38,11 @@ export function StatsBar({ activities, loading }: Props) {
 
   return (
     <div className="surface overflow-hidden">
-      <div className="grid grid-cols-2 gap-px bg-[var(--line)] sm:grid-cols-4 lg:grid-cols-7">
+      <div className="-mx-0 flex gap-px overflow-x-auto overscroll-x-contain bg-[var(--line)] sm:grid sm:grid-cols-4 sm:overflow-visible lg:grid-cols-7">
         {items.map((item) => (
           <div
             key={item.key}
-            className="bg-[var(--surface)] px-3 py-3 md:px-4"
+            className="min-w-[7.5rem] flex-1 bg-[var(--surface)] px-3 py-3 sm:min-w-0 md:px-4"
           >
             <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">
               {item.label}

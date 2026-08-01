@@ -308,31 +308,33 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
 
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           <ModeToggle value={layers} onChange={setLayers} />
-          <Button
-            variant="secondary"
-            leftIcon={
-              <RefreshCw
-                size={15}
-                className={syncing ? "animate-spin" : undefined}
-              />
-            }
-            onClick={() => handleSync(false)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              void handleSync(true);
-            }}
-            disabled={syncing}
-            title="Sync new runs. Right-click for a full rebuild."
-          >
-            {syncing ? "Syncing…" : "Sync"}
-          </Button>
-          <Button
-            variant="ghost"
-            leftIcon={<LogOut size={15} />}
-            onClick={logout}
-          >
-            Sign out
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              leftIcon={
+                <RefreshCw
+                  size={15}
+                  className={syncing ? "animate-spin" : undefined}
+                />
+              }
+              onClick={() => handleSync(false)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                void handleSync(true);
+              }}
+              disabled={syncing}
+              title="Sync new runs. Right-click for a full rebuild."
+            >
+              {syncing ? "Syncing…" : "Sync"}
+            </Button>
+            <Button
+              variant="ghost"
+              leftIcon={<LogOut size={15} />}
+              onClick={logout}
+            >
+              Sign out
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -389,15 +391,15 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
           ) : showInitialLoading ? (
             <div
               className="surface p-2"
-              style={{ height: "min(62vh, 680px)", minHeight: 280 }}
+              style={{ height: "min(58vh, 680px)", minHeight: 320 }}
             >
-              <div className="skeleton h-full min-h-[260px] w-full rounded-[10px]" />
+              <div className="skeleton h-full min-h-[300px] w-full rounded-[10px]" />
               <p className="sr-only">Loading your atlas…</p>
             </div>
           ) : (
             <div
               className="surface flex items-center justify-center px-4 text-center text-[var(--muted)]"
-              style={{ height: "min(62vh, 680px)", minHeight: 280 }}
+              style={{ height: "min(58vh, 680px)", minHeight: 320 }}
             >
               {error || "No runs to show yet."}
             </div>

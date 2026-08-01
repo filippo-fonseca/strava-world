@@ -151,7 +151,7 @@ export function WorldMap({ activities, layers, selectedId, onSelect }: Props) {
       <div
         ref={containerRef}
         className="relative w-full overflow-hidden rounded-[10px] bg-[#d7e4ec]"
-        style={{ height: "min(62vh, 680px)", minHeight: 280 }}
+        style={{ height: "min(58vh, 680px)", minHeight: 320 }}
       >
         <Map
           ref={mapRef}
@@ -175,8 +175,19 @@ export function WorldMap({ activities, layers, selectedId, onSelect }: Props) {
           onMoveEnd={(e) => setZoom(e.viewState.zoom)}
           onZoomEnd={(e) => setZoom(e.viewState.zoom)}
           onError={(e) => {
+            const message =
+              (e.error && "message" in e.error
+                ? String((e.error as { message?: string }).message)
+                : "") || String(e.error ?? "");
+            // Single tile failures / aborts are common; only banner style-level failures.
+            if (
+              /abort|cancel|Failed to fetch|AJAXError|tile/i.test(message)
+            ) {
+              console.warn("MapLibre tile warning", message);
+              return;
+            }
             console.error("MapLibre error", e);
-            setError("Map failed to load basemap tiles");
+            setError("Map failed to load basemap");
           }}
         >
           <NavigationControl position="bottom-right" showCompass={false} />
@@ -221,13 +232,13 @@ export function WorldMap({ activities, layers, selectedId, onSelect }: Props) {
                   ["linear"],
                   ["zoom"],
                   0,
-                  0.9,
-                  6,
-                  0.75,
-                  11,
-                  0.45,
-                  14,
-                  0.2,
+                  0.95,
+                  5,
+                  0.85,
+                  9,
+                  0.55,
+                  13,
+                  0.25,
                 ],
                 "heatmap-color": [
                   "interpolate",
