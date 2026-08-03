@@ -355,6 +355,8 @@ export function WorldMap({
       }
 
       const stop = stops[idx];
+      // City/region camera only — never pick a specific run.
+      onSelectRef.current(null);
       emitTour({
         status: tourPausedRef.current ? "paused" : "playing",
         phase: "stop",
@@ -364,12 +366,7 @@ export function WorldMap({
         detail: stop.detail,
       });
 
-      const highlightId = stop.activityIds[0];
-      const highlight =
-        currentActivities.find((a) => a.id === highlightId) ?? null;
-      if (highlight) onSelectRef.current(highlight);
-
-      await fitTourBounds(stop.bounds, TOUR_FLY_MS, 13);
+      await fitTourBounds(stop.bounds, TOUR_FLY_MS, 12);
       if (tourGenRef.current !== gen) return;
       await waitWhilePaused();
       if (tourGenRef.current !== gen) return;

@@ -232,6 +232,7 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
                 tour={tour}
                 disabled={tourStopCount === 0 || showInitialLoading}
                 onPlay={() => {
+                  // Tour is city-by-city camera only — clear any selected run/drawer.
                   setSelected(null);
                   setTourPaused(false);
                   setTourPlaying(true);
