@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDemoAthlete } from "@/lib/demo-data";
-import { getSession } from "@/lib/session";
+import { getSession, SESSION_TTL_SECONDS } from "@/lib/session";
 
 export async function POST() {
   const session = await getSession();
@@ -11,9 +11,10 @@ export async function POST() {
     ...athlete,
     accessToken: "demo",
     refreshToken: "demo",
-    expiresAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+    // Match persistent session cookie lifetime.
+    expiresAt: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
   };
   await session.save();
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, persisted: true });
 }
