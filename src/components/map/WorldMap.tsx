@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import clsx from "clsx";
 import Map, {
   Layer,
   NavigationControl,
@@ -19,7 +20,18 @@ import {
   countMappableActivities,
   selectMarkersForZoom,
 } from "@/lib/geo";
+import {
+  buildTourStops,
+  IDLE_TOUR_STATE,
+  TOUR_DWELL_MS,
+  TOUR_FLY_MS,
+  TOUR_OVERVIEW_MS,
+  type TourState,
+  type TourStop,
+} from "@/lib/tour";
 import { PhotoMarker } from "@/components/map/PhotoMarker";
+
+export type { TourState };
 
 /**
  * Raster basemap — avoids the classic "blue water only" failure mode of
@@ -58,6 +70,11 @@ type Props = {
   onSelect: (activity: RunActivity | null) => void;
   /** Fill parent plate (hero / instrument layout) instead of fixed viewport height. */
   fillContainer?: boolean;
+  /** Cinematic walkthrough control */
+  tourPlaying?: boolean;
+  tourPaused?: boolean;
+  tourSkipNonce?: number;
+  onTourChange?: (state: TourState) => void;
 };
 
 export function WorldMap({
@@ -66,6 +83,10 @@ export function WorldMap({
   selectedId,
   onSelect,
   fillContainer = false,
+  tourPlaying = false,
+  tourPaused = false,
+  tourSkipNonce = 0,
+  onTourChange,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -73,6 +94,78 @@ export function WorldMap({
   const [mapReady, setMapReady] = useState(false);
   const [zoom, setZoom] = useState(1.5);
   const [error, setError] = useState<string | null>(null);
+  const tourStopsRef = useRef<TourStop[]>([]);
+  const tourIndexRef = useRef(-1); // -1 overview before first stop
+  const tourTimerRef = useRef<number | null>(null);
+  const tourGenRef = useRef(0);
+  const tourPausedRef = useRef(tourPaused);
+  const onTourChangeRef = useRef(onTourChange);
+  const onSelectRef = useRef(onSelect);
+
+  useEffect(() => {
+    tourPausedRef.current = tourPaused;
+  }, [tourPaused]);
+
+  useEffect(() => {
+    onTourChangeRef.current = onTourChange;
+  }, [onTourChange]);
+
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
+
+  const emitTour = useCallback((state: TourState) => {
+    onTourChangeRef.current?.(state);
+  }, []);
+
+  const clearTourTimer = useCallback(() => {
+    if (tourTimerRef.current != null) {
+      window.clearTimeout(tourTimerRef.current);
+      tourTimerRef.current = null;
+    }
+  }, []);
+
+  const fitTourBounds = useCallback(
+    (
+      bounds: [[number, number], [number, number]],
+      duration: number,
+      maxZoom: number,
+    ) => {
+      const map = mapRef.current?.getMap();
+      if (!map) return Promise.resolve();
+
+      const reduced =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      return new Promise<void>((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          map.off("moveend", finish);
+          window.clearTimeout(timer);
+          resolve();
+        };
+        const timer = window.setTimeout(
+          finish,
+          (reduced ? 0 : duration) + 300,
+        );
+        map.on("moveend", finish);
+        try {
+          map.fitBounds(bounds, {
+            padding: 80,
+            duration: reduced ? 0 : duration,
+            maxZoom,
+            essential: true,
+          });
+        } catch {
+          finish();
+        }
+      });
+    },
+    [],
+  );
 
   const routes = useMemo(
     () => activitiesToRouteCollection(activities),
@@ -142,6 +235,7 @@ export function WorldMap({
 
   useEffect(() => {
     if (!mapReady || !selectedActivity) return;
+    if (tourPlaying) return; // cinematic tour owns the camera
     const map = mapRef.current?.getMap();
     if (!map) return;
 
@@ -160,7 +254,7 @@ export function WorldMap({
     }
     // Only re-fly when the selected run id changes (not on every activities refresh).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, selectedId]);
+  }, [mapReady, selectedId, tourPlaying]);
 
   // When the filtered set changes (search/filters), reframe to matching runs.
   const activityKey = useMemo(
@@ -174,11 +268,205 @@ export function WorldMap({
 
   useEffect(() => {
     if (!mapReady) return;
+    if (tourPlaying) return;
     if (selectedId != null) return; // selection focus wins
     fittedRef.current = false;
     const id = window.setTimeout(() => resizeAndFit(true), 60);
     return () => window.clearTimeout(id);
-  }, [mapReady, activityKey, selectedId, resizeAndFit]);
+  }, [mapReady, activityKey, selectedId, resizeAndFit, tourPlaying]);
+
+  // --- Cinematic tour ----------------------------------------------------
+  const activitiesRef = useRef(activities);
+  useEffect(() => {
+    activitiesRef.current = activities;
+  }, [activities]);
+
+  const runTourStepRef = useRef<(gen: number) => Promise<void>>(async () => {});
+
+  useEffect(() => {
+    runTourStepRef.current = async (gen: number) => {
+      const map = mapRef.current?.getMap();
+      if (!map) return;
+
+      const stops = tourStopsRef.current;
+      const idx = tourIndexRef.current;
+      const currentActivities = activitiesRef.current;
+
+      const wait = (ms: number) =>
+        new Promise<void>((resolve) => {
+          clearTourTimer();
+          tourTimerRef.current = window.setTimeout(() => {
+            tourTimerRef.current = null;
+            resolve();
+          }, ms);
+        });
+
+      const waitWhilePaused = async () => {
+        while (tourPausedRef.current && tourGenRef.current === gen) {
+          await wait(120);
+        }
+      };
+
+      // Overview first (idx === -1)
+      if (idx < 0) {
+        emitTour({
+          status: "playing",
+          phase: "overview",
+          index: 0,
+          total: stops.length,
+          label: "overview",
+          detail: "your whole atlas",
+        });
+        const allBounds = boundsFromActivities(currentActivities);
+        if (allBounds) {
+          await fitTourBounds(allBounds, TOUR_FLY_MS, 5);
+        }
+        if (tourGenRef.current !== gen) return;
+        await waitWhilePaused();
+        if (tourGenRef.current !== gen) return;
+        await wait(TOUR_OVERVIEW_MS);
+        if (tourGenRef.current !== gen) return;
+        tourIndexRef.current = 0;
+        void runTourStepRef.current(gen);
+        return;
+      }
+
+      if (idx >= stops.length) {
+        emitTour({
+          status: "playing",
+          phase: "overview",
+          index: stops.length,
+          total: stops.length,
+          label: "finale",
+          detail: "back to the world",
+        });
+        const allBounds = boundsFromActivities(currentActivities);
+        if (allBounds) {
+          await fitTourBounds(allBounds, TOUR_FLY_MS, 5);
+        }
+        if (tourGenRef.current !== gen) return;
+        await wait(TOUR_OVERVIEW_MS);
+        if (tourGenRef.current !== gen) return;
+        tourGenRef.current += 1;
+        clearTourTimer();
+        onSelectRef.current(null);
+        emitTour({ ...IDLE_TOUR_STATE, total: stops.length, phase: "done" });
+        return;
+      }
+
+      const stop = stops[idx];
+      emitTour({
+        status: tourPausedRef.current ? "paused" : "playing",
+        phase: "stop",
+        index: idx + 1,
+        total: stops.length,
+        label: stop.label,
+        detail: stop.detail,
+      });
+
+      const highlightId = stop.activityIds[0];
+      const highlight =
+        currentActivities.find((a) => a.id === highlightId) ?? null;
+      if (highlight) onSelectRef.current(highlight);
+
+      await fitTourBounds(stop.bounds, TOUR_FLY_MS, 13);
+      if (tourGenRef.current !== gen) return;
+      await waitWhilePaused();
+      if (tourGenRef.current !== gen) return;
+      await wait(TOUR_DWELL_MS);
+      if (tourGenRef.current !== gen) return;
+
+      tourIndexRef.current = idx + 1;
+      void runTourStepRef.current(gen);
+    };
+  }, [clearTourTimer, emitTour, fitTourBounds]);
+
+  // Start / stop tour from parent controls.
+  useEffect(() => {
+    if (!mapReady) return;
+
+    if (!tourPlaying) {
+      tourGenRef.current += 1;
+      clearTourTimer();
+      if (tourStopsRef.current.length) {
+        emitTour({
+          ...IDLE_TOUR_STATE,
+          total: tourStopsRef.current.length,
+        });
+      } else {
+        emitTour(IDLE_TOUR_STATE);
+      }
+      return;
+    }
+
+    const stops = buildTourStops(activities);
+    tourStopsRef.current = stops;
+    if (!stops.length) {
+      emitTour(IDLE_TOUR_STATE);
+      return;
+    }
+
+    tourIndexRef.current = -1;
+    const gen = ++tourGenRef.current;
+    emitTour({
+      status: "playing",
+      phase: "overview",
+      index: 0,
+      total: stops.length,
+      label: "overview",
+      detail: "your whole atlas",
+    });
+    void runTourStepRef.current(gen);
+
+    return () => {
+      tourGenRef.current += 1;
+      clearTourTimer();
+    };
+    // Only react to play toggling / activity set for a new tour session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, tourPlaying, activityKey]);
+
+  // Pause / resume status surfacing
+  useEffect(() => {
+    if (!tourPlaying) return;
+    const stops = tourStopsRef.current;
+    const idx = tourIndexRef.current;
+    if (idx < 0) {
+      emitTour({
+        status: tourPaused ? "paused" : "playing",
+        phase: "overview",
+        index: 0,
+        total: stops.length,
+        label: "overview",
+        detail: "your whole atlas",
+      });
+      return;
+    }
+    if (idx >= stops.length) return;
+    const stop = stops[idx];
+    emitTour({
+      status: tourPaused ? "paused" : "playing",
+      phase: "stop",
+      index: idx + 1,
+      total: stops.length,
+      label: stop.label,
+      detail: stop.detail,
+    });
+  }, [tourPaused, tourPlaying, emitTour]);
+
+  // Skip to next stop
+  useEffect(() => {
+    if (!tourPlaying || !tourSkipNonce) return;
+    clearTourTimer();
+    const gen = ++tourGenRef.current;
+    if (tourIndexRef.current < 0) {
+      tourIndexRef.current = 0;
+    } else {
+      tourIndexRef.current += 1;
+    }
+    void runTourStepRef.current(gen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tourSkipNonce]);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -448,6 +736,20 @@ export function WorldMap({
           ))}
         </Map>
 
+        {tourPlaying && (
+          <div className="pointer-events-none absolute left-3 top-3 z-10 inline-flex max-w-[min(100%-1.5rem,20rem)] items-center gap-2 rounded-full border border-[var(--line)] bg-[rgba(10,10,10,0.78)] px-3 py-1.5">
+            <span
+              className={clsx(
+                "h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]",
+                !tourPaused && "animate-pulse",
+              )}
+            />
+            <span className="truncate font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink)]">
+              {tourPaused ? "tour paused" : "cinematic tour"}
+            </span>
+          </div>
+        )}
+
         {mappableCount === 0 && activities.length > 0 && (
           <div className="absolute inset-x-3 bottom-3 z-10 rounded-[10px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--ink)] sm:inset-x-4">
             Runs loaded, but none include GPS. Right-click{" "}
@@ -464,3 +766,4 @@ export function WorldMap({
     </div>
   );
 }
+
