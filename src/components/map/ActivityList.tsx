@@ -1,44 +1,61 @@
 "use client";
 
 import clsx from "clsx";
+import { useState } from "react";
 import { formatDate, formatDistance } from "@/lib/format";
 import type { RunActivity } from "@/lib/types";
 import { Panel } from "@/components/ui/Panel";
+
+const PAGE_SIZE = 10;
 
 type Props = {
   activities: RunActivity[];
   selectedId?: number | null;
   onSelect: (activity: RunActivity) => void;
-  /** 1-based index offset when paginating (default 1). */
-  indexStart?: number;
 };
 
-export function ActivityList({
-  activities,
-  selectedId,
-  onSelect,
-  indexStart = 1,
-}: Props) {
+export function ActivityList({ activities, selectedId, onSelect }: Props) {
+  const [page, setPage] = useState(0);
+  /** How many rows to reveal from the current page start (grows via “show more”). */
+  const [reveal, setReveal] = useState(PAGE_SIZE);
+
+  const total = activities.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * PAGE_SIZE;
+  const end = Math.min(start + reveal, total);
+  const visible = activities.slice(start, end);
+  const hiddenFromHere = Math.max(0, total - end);
+  const nextChunk = Math.min(PAGE_SIZE, hiddenFromHere);
+
+  const rangeLabel =
+    total === 0 ? "0" : `${start + 1}–${end} of ${total}`;
+
+  function goToPage(next: number) {
+    setPage(next);
+    setReveal(PAGE_SIZE);
+  }
+
   return (
     <Panel
       title="history"
       className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden !p-3"
       action={
         <span className="font-mono text-[11px] tabular-nums text-[var(--muted)]">
-          {activities.length}
+          {rangeLabel}
         </span>
       }
     >
       <div className="min-h-0 min-w-0 flex-1 space-y-0.5 overflow-x-hidden overflow-y-auto overscroll-contain rounded-[var(--radius)]">
-        {activities.length === 0 ? (
+        {total === 0 ? (
           <p className="px-2 py-6 text-center font-mono text-[12px] text-[var(--muted)]">
             no runs match these filters
           </p>
         ) : (
-          activities.map((activity, i) => {
+          visible.map((activity, i) => {
             const active = selectedId === activity.id;
             const hasPhotos = activity.totalPhotoCount > 0;
-            const index = indexStart + i;
+            const index = start + i + 1;
             return (
               <button
                 key={activity.id}
@@ -95,6 +112,53 @@ export function ActivityList({
           })
         )}
       </div>
+
+      {total > PAGE_SIZE ? (
+        <div className="mt-2 flex min-w-0 flex-col gap-2 border-t border-[var(--line)] pt-2">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              disabled={safePage <= 0}
+              onClick={() => goToPage(safePage - 1)}
+              className="pressable min-h-9 rounded-[var(--radius)] border border-[var(--line)] px-2.5 font-mono text-[11px] text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              ← prev
+            </button>
+            <span className="min-w-0 truncate font-mono text-[10px] tabular-nums text-[var(--faint)]">
+              page {safePage + 1} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={safePage >= totalPages - 1}
+              onClick={() => goToPage(safePage + 1)}
+              className="pressable min-h-9 rounded-[var(--radius)] border border-[var(--line)] px-2.5 font-mono text-[11px] text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              next →
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {nextChunk > 0 ? (
+              <button
+                type="button"
+                onClick={() => setReveal((n) => n + PAGE_SIZE)}
+                className="link-accent font-mono text-[11px] lowercase"
+              >
+                show {nextChunk} more
+              </button>
+            ) : null}
+            {reveal > PAGE_SIZE ? (
+              <button
+                type="button"
+                onClick={() => setReveal(PAGE_SIZE)}
+                className="font-mono text-[11px] lowercase text-[var(--muted)] hover:text-[var(--ink)]"
+              >
+                show less
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </Panel>
   );
 }

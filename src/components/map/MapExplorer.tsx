@@ -161,6 +161,7 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
             ) : (
               <div className="min-h-[240px] min-w-0 flex-1 overflow-hidden lg:min-h-0">
                 <ActivityList
+                  key={`${filtered.length}:${filtered[0]?.id ?? ""}:${filtered[filtered.length - 1]?.id ?? ""}`}
                   activities={filtered}
                   selectedId={activeSelection?.id}
                   onSelect={focusRun}
