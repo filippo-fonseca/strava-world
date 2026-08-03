@@ -1,4 +1,3 @@
-import Image from "next/image";
 import clsx from "clsx";
 
 type Props = {
@@ -23,7 +22,8 @@ export function StravaPoweredBy({ className, variant = "orange" }: Props) {
         className,
       )}
     >
-      <Image
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
         src={src}
         alt="Powered by Strava"
         width={162}

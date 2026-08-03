@@ -4,9 +4,9 @@ import clsx from "clsx";
 import type { MapLayers } from "@/lib/types";
 
 const layers: Array<{ id: keyof MapLayers; label: string }> = [
-  { id: "heat", label: "Heat" },
-  { id: "routes", label: "Routes" },
-  { id: "photos", label: "Photos" },
+  { id: "heat", label: "heat" },
+  { id: "routes", label: "routes" },
+  { id: "photos", label: "photos" },
 ];
 
 type Props = {
@@ -17,7 +17,7 @@ type Props = {
 export function ModeToggle({ value, onChange }: Props) {
   return (
     <div
-      className="inline-flex max-w-full flex-wrap gap-1 rounded-[10px] border border-[var(--line)] bg-[var(--surface)] p-1"
+      className="inline-flex max-w-full flex-wrap gap-1 rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface)] p-0.5"
       role="group"
       aria-label="Map layers"
     >
@@ -30,10 +30,10 @@ export function ModeToggle({ value, onChange }: Props) {
             aria-pressed={active}
             onClick={() => onChange({ ...value, [id]: !active })}
             className={clsx(
-              "pressable min-h-9 rounded-[8px] px-3 py-1.5 text-sm font-medium",
+              "pressable min-h-9 rounded-[var(--radius)] px-2.5 py-1 font-mono text-[11px] font-medium lowercase tracking-wide",
               active
                 ? "bg-[var(--accent-soft)] text-[var(--accent)]"
-                : "text-[var(--muted)] hover:text-[var(--ink)]",
+                : "text-[var(--muted)] hover:text-[var(--ink-display)]",
             )}
           >
             {label}

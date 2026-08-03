@@ -1,4 +1,3 @@
-import Image from "next/image";
 import clsx from "clsx";
 
 type Props = {
@@ -14,13 +13,13 @@ export function StravaConnectButton({
   disabled,
 }: Props) {
   const img = (
-    <Image
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
       src="/brand/strava/btn_strava_connect_with_orange.svg"
       alt="Connect with Strava"
       width={193}
       height={48}
       className="h-12 w-auto"
-      priority
     />
   );
 
