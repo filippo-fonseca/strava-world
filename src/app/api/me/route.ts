@@ -7,6 +7,8 @@ export async function GET() {
   const session = await getSession();
 
   if (session.isDemo) {
+    // Sliding renewal — keep demo login alive across browser restarts.
+    await session.save();
     return NextResponse.json({
       authenticated: true,
       isDemo: true,
@@ -23,6 +25,8 @@ export async function GET() {
       stravaConfigured: isStravaConfigured(),
     });
   }
+
+  await session.save();
 
   const athlete = {
     id: session.athlete.id,

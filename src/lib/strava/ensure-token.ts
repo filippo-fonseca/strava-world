@@ -10,6 +10,8 @@ export async function ensureAccessToken(): Promise<{
   if (!session.athlete) return null;
 
   if (session.isDemo) {
+    // Renew persistent cookie while the demo atlas is in use.
+    await session.save();
     return { athlete: session.athlete, isDemo: true };
   }
 
@@ -23,5 +25,7 @@ export async function ensureAccessToken(): Promise<{
     return { athlete: refreshed, isDemo: false };
   }
 
+  // Sliding session renewal on authenticated API use.
+  await session.save();
   return { athlete: session.athlete, isDemo: false };
 }

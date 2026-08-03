@@ -1,5 +1,7 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { LandingPage } from "@/components/landing/LandingPage";
+import { getSession } from "@/lib/session";
 import { isStravaConfigured } from "@/lib/strava/client";
 
 function LandingFallback() {
@@ -23,7 +25,13 @@ function LandingFallback() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const session = await getSession();
+  // Returning visitors with a valid session cookie skip the landing page.
+  if (session.athlete) {
+    redirect("/map");
+  }
+
   return (
     <Suspense fallback={<LandingFallback />}>
       <LandingPage stravaConfigured={isStravaConfigured()} />
