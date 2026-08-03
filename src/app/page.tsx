@@ -4,20 +4,19 @@ import { isStravaConfigured } from "@/lib/strava/client";
 
 function LandingFallback() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 pt-6 sm:px-6 sm:pt-10">
-      <div className="flex items-center justify-between">
-        <div className="skeleton h-7 w-36" />
-        <div className="skeleton h-4 w-14" />
-      </div>
-      <div className="mt-14 sm:mt-20">
-        <div className="skeleton mb-3 h-4 w-40" />
-        <div className="skeleton mb-3 h-12 w-full max-w-md" />
-        <div className="skeleton mb-2 h-12 w-full max-w-sm" />
-        <div className="skeleton mt-5 h-5 w-full max-w-lg" />
-        <div className="skeleton mt-2 h-5 w-2/3 max-w-md" />
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <div className="skeleton h-12 w-full sm:w-40" />
-          <div className="skeleton h-12 w-full sm:w-36" />
+    <main className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col px-4 pt-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)_240px]">
+        <div className="space-y-3">
+          <div className="skeleton h-7 w-36" />
+          <div className="skeleton h-5 w-24" />
+          <div className="skeleton mt-6 h-20 w-full" />
+          <div className="skeleton h-12 w-40" />
+        </div>
+        <div className="skeleton min-h-[50dvh] w-full lg:min-h-[70vh]" />
+        <div className="flex gap-2 overflow-hidden lg:flex-col">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="skeleton h-20 min-w-[9rem] flex-1" />
+          ))}
         </div>
       </div>
     </main>

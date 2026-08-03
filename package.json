@@ -2,7 +2,7 @@
   "name": "strava-world",
   "version": "0.1.0",
   "private": false,
-  "description": "Visualize your Strava runs on a plain world map — heatmaps, routes, photo previews, and quiet stats.",
+  "description": "Your Strava journey on one map — heatmaps, routes, photo previews, and journey stats in a barebones instrument shell.",
   "license": "MIT",
   "repository": {
     "type": "git",

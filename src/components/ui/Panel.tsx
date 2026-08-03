@@ -18,7 +18,7 @@ export function Panel({
   return (
     <div
       className={clsx(
-        "p-4 md:p-5",
+        "p-3 md:p-4",
         inset ? "surface-inset" : "surface",
         className,
       )}
@@ -27,7 +27,7 @@ export function Panel({
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between gap-3">
           {title ? (
-            <h3 className="font-[family-name:var(--font-display)] text-lg tracking-tight text-[var(--ink)]">
+            <h3 className="font-[family-name:var(--font-display)] text-base font-semibold tracking-tight text-[var(--ink-display)] lowercase">
               {title}
             </h3>
           ) : (

@@ -14,7 +14,7 @@ Demo mode works without Strava credentials. For live data, add your Strava API k
 ## Guidelines
 
 - Prefer small, atomic commits with clear messages
-- Keep the visual language plain and quiet (warm paper, hairline borders, typography-led hierarchy — no neumorphism or decorative chrome)
+- Keep the visual language dark, barebones, and purposeful (hairline borders, mono labels, typography-led hierarchy — no neumorphism, gradient orbs, or decorative chrome). Preserve the central-map hero layout.
 - Design for mobile widths (~375px) as well as desktop
 - Don’t commit secrets — use `.env.local`
 - Run `npm run lint` and `npm run build` before opening a PR

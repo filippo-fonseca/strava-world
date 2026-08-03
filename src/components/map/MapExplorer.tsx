@@ -1,30 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { LogOut, RefreshCw } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { AthleteSummary, MapLayers, RunActivity } from "@/lib/types";
 import { DEFAULT_MAP_LAYERS } from "@/lib/types";
-import {
-  clearRunsCache,
-  formatSyncedAt,
-  isCacheFresh,
-  readRunsCache,
-  RUNS_CACHE_MAX_AGE_MS,
-} from "@/lib/runs-cache";
-import { hydrateActivities } from "@/lib/geo";
-import {
-  applySyncResponse,
-  fetchActivitiesFromApi,
-  shouldFullRebuild,
-  syncCursorFromCache,
-  type SyncMode,
-} from "@/lib/sync-runs";
-import { WorldMapDynamic as WorldMap } from "@/components/map/WorldMapDynamic";
+import { formatSyncedAt } from "@/lib/runs-cache";
+import { formatDistance } from "@/lib/format";
+import { compactStatItems, computeJourneyAnalytics } from "@/lib/analytics";
+import { useRunsAtlas } from "@/hooks/useRunsAtlas";
+import { WorldMapDynamic as WorldMap, MapSkeleton } from "@/components/map/WorldMapDynamic";
 import { ModeToggle } from "@/components/map/ModeToggle";
 import { ActivityList } from "@/components/map/ActivityList";
 import { ActivityDrawer } from "@/components/map/ActivityDrawer";
-import { StatsBar } from "@/components/map/StatsBar";
+import { AppShell } from "@/components/shell/AppShell";
+import { HeroMapLayout } from "@/components/shell/HeroMapLayout";
+import { StatBlock } from "@/components/stats/StatBlock";
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 
@@ -34,393 +25,238 @@ type Props = {
 };
 
 export function MapExplorer({ initialAthlete, isDemo }: Props) {
-  const router = useRouter();
-  const [activities, setActivities] = useState<RunActivity[]>([]);
-  const [syncedAt, setSyncedAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [statusNote, setStatusNote] = useState<string | null>(null);
+  const atlas = useRunsAtlas({
+    athleteId: initialAthlete?.id,
+    isDemo,
+  });
   const [layers, setLayers] = useState<MapLayers>(DEFAULT_MAP_LAYERS);
   const [selected, setSelected] = useState<RunActivity | null>(null);
   const [query, setQuery] = useState("");
-  const [, startTransition] = useTransition();
-  const activitiesRef = useRef<RunActivity[]>([]);
-  const syncedAtRef = useRef<string | null>(null);
-  const syncingRef = useRef(false);
+
+  const registerSelectedReconcile = atlas.registerSelectedReconcile;
 
   useEffect(() => {
-    activitiesRef.current = activities;
-  }, [activities]);
-
-  useEffect(() => {
-    syncedAtRef.current = syncedAt;
-  }, [syncedAt]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    function commitResult(
-      nextActivities: RunActivity[],
-      nextSyncedAt: string,
-      note: string | null,
-    ) {
-      startTransition(() => {
-        setActivities(nextActivities);
-        setSyncedAt(nextSyncedAt);
-        setSelected((current) => {
-          if (!current) return null;
-          return nextActivities.find((item) => item.id === current.id) ?? null;
-        });
-        setStatusNote(note);
+    registerSelectedReconcile((next) => {
+      setSelected((current) => {
+        if (!current) return null;
+        return next.find((item) => item.id === current.id) ?? null;
       });
-      activitiesRef.current = nextActivities;
-      syncedAtRef.current = nextSyncedAt;
-    }
-
-    async function runSync(options: {
-      mode: SyncMode;
-      forceRefresh?: boolean;
-      background?: boolean;
-      since?: string | null;
-    }) {
-      if (syncingRef.current) return;
-      syncingRef.current = true;
-      if (!options.background) setLoading(true);
-      setSyncing(true);
-      if (!options.background) setError(null);
-
-      try {
-        const response = await fetchActivitiesFromApi({
-          mode: options.mode,
-          since: options.since,
-          forceRefresh: options.forceRefresh,
-        });
-        if (cancelled) return;
-
-        const result = await applySyncResponse({
-          existing: activitiesRef.current,
-          response,
-          athleteId: initialAthlete?.id,
-          isDemo,
-        });
-
-        let note: string | null = null;
-        if (result.mode === "incremental") {
-          if (result.added > 0 || result.updated > 0) {
-            const parts = [];
-            if (result.added > 0) {
-              parts.push(
-                `${result.added} new run${result.added === 1 ? "" : "s"}`,
-              );
-            }
-            if (result.updated > 0) {
-              parts.push(`${result.updated} updated`);
-            }
-            note = parts.join(" · ");
-          } else {
-            note = "Up to date";
-          }
-        } else {
-          note = `${result.activities.length} runs`;
-        }
-
-        commitResult(result.activities, result.syncedAt, note);
-        setError(null);
-      } catch (err) {
-        if (!cancelled) {
-          if (activitiesRef.current.length === 0) {
-            setError(err instanceof Error ? err.message : "Failed to load");
-          } else {
-            setStatusNote("Sync failed — showing cached runs");
-          }
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-          setSyncing(false);
-        }
-        syncingRef.current = false;
-      }
-    }
-
-    async function bootstrap() {
-      setError(null);
-      const cached = await readRunsCache(initialAthlete?.id, isDemo);
-      if (cancelled) return;
-
-      if (cached?.activities?.length) {
-        const hydrated = hydrateActivities(cached.activities);
-        commitResult(hydrated, cached.syncedAt, null);
-        setLoading(false);
-
-        if (shouldFullRebuild(cached.syncedAt)) {
-          void runSync({ mode: "full", forceRefresh: true, background: true });
-          return;
-        }
-
-        if (!isCacheFresh(cached.syncedAt, RUNS_CACHE_MAX_AGE_MS)) {
-          void runSync({
-            mode: "incremental",
-            since: syncCursorFromCache(cached),
-            background: true,
-          });
-        }
-        return;
-      }
-
-      await runSync({ mode: "full", background: false });
-    }
-
-    void bootstrap();
-
-    function onVisible() {
-      if (document.visibilityState !== "visible") return;
-      if (syncingRef.current) return;
-      const cursor = syncedAtRef.current;
-      if (!cursor) return;
-      if (isCacheFresh(cursor, RUNS_CACHE_MAX_AGE_MS)) return;
-
-      if (shouldFullRebuild(cursor)) {
-        void runSync({ mode: "full", forceRefresh: true, background: true });
-      } else {
-        void runSync({
-          mode: "incremental",
-          since: newestCursor(activitiesRef.current) || cursor,
-          background: true,
-        });
-      }
-    }
-
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [initialAthlete?.id, isDemo]);
+    });
+    return () => registerSelectedReconcile(null);
+  }, [registerSelectedReconcile]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return activities;
-    return activities.filter((activity) =>
+    if (!q) return atlas.activities;
+    return atlas.activities.filter((activity) =>
       [activity.name, activity.locationCity, activity.locationCountry]
         .filter(Boolean)
         .some((value) => value!.toLowerCase().includes(q)),
     );
-  }, [activities, query]);
+  }, [atlas.activities, query]);
 
-  async function handleSync(forceFull = false) {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
-    setSyncing(true);
-    setError(null);
-    setStatusNote(null);
+  const analytics = useMemo(
+    () => computeJourneyAnalytics(atlas.activities),
+    [atlas.activities],
+  );
+  const compactStats = useMemo(
+    () => compactStatItems(analytics).slice(0, 6),
+    [analytics],
+  );
 
-    try {
-      const useFull =
-        forceFull ||
-        activitiesRef.current.length === 0 ||
-        shouldFullRebuild(syncedAtRef.current);
+  const showInitialLoading = atlas.loading && atlas.activities.length === 0;
+  const showMap = atlas.activities.length > 0;
 
-      const response = await fetchActivitiesFromApi({
-        mode: useFull ? "full" : "incremental",
-        since: useFull
-          ? null
-          : newestCursor(activitiesRef.current) || syncedAtRef.current,
-        forceRefresh: useFull,
-      });
+  const athleteLabel = initialAthlete
+    ? `${initialAthlete.firstname} ${initialAthlete.lastname}`.toLowerCase()
+    : "explorer";
+  const meta = [
+    isDemo ? "demo" : "strava",
+    atlas.syncing ? "updating…" : formatSyncedAt(atlas.syncedAt).toLowerCase(),
+    atlas.statusNote,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-      const result = await applySyncResponse({
-        existing: activitiesRef.current,
-        response,
-        athleteId: initialAthlete?.id,
-        isDemo,
-      });
-
-      startTransition(() => {
-        setActivities(result.activities);
-        setSyncedAt(result.syncedAt);
-        setSelected((current) => {
-          if (!current) return null;
-          return result.activities.find((item) => item.id === current.id) ?? null;
-        });
-        if (result.mode === "incremental") {
-          if (result.added || result.updated) {
-            setStatusNote(
-              [
-                result.added
-                  ? `${result.added} new run${result.added === 1 ? "" : "s"}`
-                  : null,
-                result.updated ? `${result.updated} updated` : null,
-              ]
-                .filter(Boolean)
-                .join(" · "),
-            );
-          } else {
-            setStatusNote("Up to date");
-          }
-        } else {
-          setStatusNote(`Rebuilt ${result.activities.length} runs`);
-        }
-      });
-      activitiesRef.current = result.activities;
-      syncedAtRef.current = result.syncedAt;
-    } catch (err) {
-      if (activitiesRef.current.length === 0) {
-        setError(err instanceof Error ? err.message : "Sync failed");
-      } else {
-        setStatusNote("Sync failed — showing cached runs");
-      }
-    } finally {
-      setLoading(false);
-      setSyncing(false);
-      syncingRef.current = false;
-    }
-  }
-
-  async function logout() {
-    await clearRunsCache(initialAthlete?.id, isDemo);
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
-    router.refresh();
-  }
-
-  const showInitialLoading = loading && activities.length === 0;
-  const showMap = activities.length > 0;
+  const rankedPreview = useMemo(() => {
+    return [...filtered]
+      .sort((a, b) => Date.parse(b.startDate) - Date.parse(a.startDate))
+      .slice(0, 8);
+  }, [filtered]);
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col gap-3 px-3 pb-[calc(1rem+var(--safe-bottom))] pt-3 sm:gap-4 sm:px-5 sm:py-5 md:px-6">
-      <header className="surface flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-4">
-        <div className="min-w-0">
-          <p className="font-[family-name:var(--font-display)] text-xl tracking-tight">
-            Strava World
-          </p>
-          <p className="truncate text-sm text-[var(--muted)]">
-            {initialAthlete
-              ? `${initialAthlete.firstname} ${initialAthlete.lastname}`
-              : "Explorer"}
-            {isDemo ? " · Demo" : " · Strava"}
-            {" · "}
-            {syncing ? "Updating…" : formatSyncedAt(syncedAt)}
-            {statusNote && !syncing ? ` · ${statusNote}` : ""}
-          </p>
-        </div>
-
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-          <ModeToggle value={layers} onChange={setLayers} />
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="secondary"
-              leftIcon={
-                <RefreshCw
-                  size={15}
-                  className={syncing ? "animate-spin" : undefined}
-                />
-              }
-              onClick={() => handleSync(false)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                void handleSync(true);
-              }}
-              disabled={syncing}
-              title="Sync new runs. Right-click for a full rebuild."
-            >
-              {syncing ? "Syncing…" : "Sync"}
-            </Button>
-            <Button
-              variant="ghost"
-              leftIcon={<LogOut size={15} />}
-              onClick={logout}
-            >
-              Sign out
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <StatsBar activities={activities} loading={showInitialLoading} />
-
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-4">
-        <div className="order-2 flex min-h-[280px] flex-col gap-3 lg:order-1 lg:min-h-0 lg:max-h-[calc(100vh-12rem)]">
-          <Panel inset className="!p-2.5">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search city, country, run…"
-              className="w-full bg-transparent px-2 py-2 text-sm outline-none placeholder:text-[var(--muted)]"
-              aria-label="Search runs"
-            />
-          </Panel>
-          {showInitialLoading ? (
-            <Panel className="flex flex-1 flex-col gap-2 !p-3">
-              <div className="skeleton h-4 w-20" />
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 py-1">
-                  <div className="skeleton h-10 w-10 shrink-0 rounded-full" />
-                  <div className="min-w-0 flex-1">
-                    <div className="skeleton mb-1.5 h-3.5 w-[75%]" />
-                    <div className="skeleton h-3 w-[50%]" />
+    <AppShell
+      athleteLabel={athleteLabel}
+      meta={meta}
+      actions={
+        <>
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={
+              <RefreshCw
+                size={14}
+                className={atlas.syncing ? "animate-spin" : undefined}
+              />
+            }
+            onClick={() => atlas.sync(false)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              void atlas.sync(true);
+            }}
+            disabled={atlas.syncing}
+            title="Sync new runs. Right-click for a full rebuild."
+          >
+            {atlas.syncing ? "syncing…" : "sync"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<LogOut size={14} />}
+            onClick={atlas.logout}
+          >
+            sign out
+          </Button>
+        </>
+      }
+    >
+      <HeroMapLayout
+        mapFirstOnMobile
+        left={
+          <>
+            <Panel inset className="!p-2">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="search city, country, run…"
+                className="w-full bg-transparent px-2 py-2 font-mono text-[12px] outline-none placeholder:text-[var(--faint)]"
+                aria-label="Search runs"
+              />
+            </Panel>
+            {showInitialLoading ? (
+              <Panel className="flex flex-1 flex-col gap-2 !p-3">
+                <div className="skeleton h-3 w-16" />
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 py-1">
+                    <div className="skeleton h-10 w-10 shrink-0 rounded-full" />
+                    <div className="min-w-0 flex-1">
+                      <div className="skeleton mb-1.5 h-3.5 w-[75%]" />
+                      <div className="skeleton h-3 w-[50%]" />
+                    </div>
                   </div>
+                ))}
+              </Panel>
+            ) : atlas.error && atlas.activities.length === 0 ? (
+              <Panel className="flex flex-1 flex-col items-start justify-center gap-3 text-[var(--accent)]">
+                <p className="text-sm">{atlas.error}</p>
+                <Button variant="secondary" onClick={() => atlas.sync(true)}>
+                  try again
+                </Button>
+              </Panel>
+            ) : (
+              <div className="min-h-[240px] flex-1 lg:min-h-0">
+                <ActivityList
+                  activities={filtered}
+                  selectedId={selected?.id}
+                  onSelect={setSelected}
+                />
+              </div>
+            )}
+          </>
+        }
+        map={
+          <>
+            {showMap ? (
+              <WorldMap
+                activities={filtered}
+                layers={layers}
+                selectedId={selected?.id}
+                onSelect={setSelected}
+                fillContainer
+              />
+            ) : showInitialLoading ? (
+              <MapSkeleton />
+            ) : (
+              <div className="grid h-full place-items-center px-4 text-center font-mono text-[12px] text-[var(--muted)]">
+                {atlas.error || "no runs to show yet"}
+              </div>
+            )}
+            <ActivityDrawer activity={selected} onClose={() => setSelected(null)} />
+          </>
+        }
+        mapCaption={
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <ModeToggle value={layers} onChange={setLayers} />
+            <span>
+              drag to pan · scroll to zoom · tap a run for details
+            </span>
+          </div>
+        }
+        right={
+          <>
+            {showInitialLoading
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="skeleton h-[88px] min-w-[9.5rem] shrink-0 snap-start lg:min-w-0"
+                  />
+                ))
+              : compactStats.map((item, index) => (
+                  <StatBlock
+                    key={item.key}
+                    label={item.label}
+                    value={item.value}
+                    accent={index === 0}
+                  />
+                ))}
+
+            <div className="min-w-[14rem] shrink-0 snap-start rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface)] p-3 lg:min-w-0 lg:flex-1">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="mono-label">recent</p>
+                <Link
+                  href="/stats"
+                  className="link-accent font-mono text-[11px] lowercase"
+                >
+                  all stats →
+                </Link>
+              </div>
+              {showInitialLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="skeleton h-8 w-full" />
+                  ))}
                 </div>
-              ))}
-            </Panel>
-          ) : error && activities.length === 0 ? (
-            <Panel className="flex flex-1 flex-col items-start justify-center gap-3 text-[var(--accent)]">
-              <p>{error}</p>
-              <Button variant="secondary" onClick={() => handleSync(true)}>
-                Try again
-              </Button>
-            </Panel>
-          ) : (
-            <ActivityList
-              activities={filtered}
-              selectedId={selected?.id}
-              onSelect={setSelected}
-            />
-          )}
-        </div>
-
-        <div className="relative order-1 min-h-[280px] lg:order-2 lg:min-h-0">
-          {showMap ? (
-            <WorldMap
-              activities={filtered}
-              layers={layers}
-              selectedId={selected?.id}
-              onSelect={setSelected}
-            />
-          ) : showInitialLoading ? (
-            <div
-              className="surface p-2"
-              style={{ height: "min(58vh, 680px)", minHeight: 320 }}
-            >
-              <div className="skeleton h-full min-h-[300px] w-full rounded-[10px]" />
-              <p className="sr-only">Loading your atlas…</p>
+              ) : rankedPreview.length === 0 ? (
+                <p className="font-mono text-[11px] text-[var(--muted)]">
+                  no runs yet
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {rankedPreview.map((activity, index) => (
+                    <li key={activity.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelected(activity)}
+                        className="pressable flex min-h-10 w-full items-center gap-2 rounded-[var(--radius)] px-1.5 py-1.5 text-left"
+                      >
+                        <span className="w-4 shrink-0 font-mono text-[11px] tabular-nums text-[var(--faint)]">
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--ink)]">
+                          {activity.name}
+                        </span>
+                        <span className="shrink-0 font-mono text-[10px] text-[var(--muted)]">
+                          {formatDistance(activity.distance)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          ) : (
-            <div
-              className="surface flex items-center justify-center px-4 text-center text-[var(--muted)]"
-              style={{ height: "min(58vh, 680px)", minHeight: 320 }}
-            >
-              {error || "No runs to show yet."}
-            </div>
-          )}
-          <ActivityDrawer activity={selected} onClose={() => setSelected(null)} />
-        </div>
-      </div>
-    </div>
+          </>
+        }
+      />
+    </AppShell>
   );
-}
-
-function newestCursor(activities: RunActivity[]) {
-  if (!activities.length) return null;
-  let newest = activities[0].startDate;
-  let newestTs = Date.parse(newest);
-  for (const activity of activities) {
-    const ts = Date.parse(activity.startDate);
-    if (Number.isFinite(ts) && ts > newestTs) {
-      newestTs = ts;
-      newest = activity.startDate;
-    }
-  }
-  return newest;
 }

@@ -56,9 +56,17 @@ type Props = {
   layers: MapLayers;
   selectedId?: number | null;
   onSelect: (activity: RunActivity | null) => void;
+  /** Fill parent plate (hero / instrument layout) instead of fixed viewport height. */
+  fillContainer?: boolean;
 };
 
-export function WorldMap({ activities, layers, selectedId, onSelect }: Props) {
+export function WorldMap({
+  activities,
+  layers,
+  selectedId,
+  onSelect,
+  fillContainer = false,
+}: Props) {
   const mapRef = useRef<MapRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fittedRef = useRef(false);
@@ -147,11 +155,25 @@ export function WorldMap({ activities, layers, selectedId, onSelect }: Props) {
   };
 
   return (
-    <div className="surface relative w-full overflow-hidden p-1.5 sm:p-2">
+    <div
+      className={
+        fillContainer
+          ? "relative h-full min-h-[50dvh] w-full overflow-hidden lg:min-h-0"
+          : "surface relative w-full overflow-hidden p-1.5 sm:p-2"
+      }
+    >
       <div
         ref={containerRef}
-        className="relative w-full overflow-hidden rounded-[10px] bg-[#d7e4ec]"
-        style={{ height: "min(58vh, 680px)", minHeight: 320 }}
+        className={
+          fillContainer
+            ? "relative h-full w-full overflow-hidden rounded-[var(--radius)] bg-[#d7e4ec]"
+            : "relative w-full overflow-hidden rounded-[var(--radius)] bg-[#d7e4ec]"
+        }
+        style={
+          fillContainer
+            ? { height: "100%", minHeight: "100%" }
+            : { height: "min(58vh, 680px)", minHeight: 320 }
+        }
       >
         <Map
           ref={mapRef}
