@@ -19,11 +19,17 @@ import { ModeToggle } from "@/components/map/ModeToggle";
 import { ActivityList } from "@/components/map/ActivityList";
 import { ActivityDrawer } from "@/components/map/ActivityDrawer";
 import { RunFiltersBar } from "@/components/map/RunFiltersBar";
+import { TourControls } from "@/components/map/TourControls";
 import { AppShell } from "@/components/shell/AppShell";
 import { HeroMapLayout } from "@/components/shell/HeroMapLayout";
 import { StatBlock } from "@/components/stats/StatBlock";
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
+import {
+  buildTourStops,
+  IDLE_TOUR_STATE,
+  type TourState,
+} from "@/lib/tour";
 
 type Props = {
   initialAthlete: AthleteSummary | null;
@@ -38,6 +44,10 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
   const [layers, setLayers] = useState<MapLayers>(DEFAULT_MAP_LAYERS);
   const [selected, setSelected] = useState<RunActivity | null>(null);
   const [filters, setFilters] = useState<RunFilters>(EMPTY_RUN_FILTERS);
+  const [tourPlaying, setTourPlaying] = useState(false);
+  const [tourPaused, setTourPaused] = useState(false);
+  const [tourSkipNonce, setTourSkipNonce] = useState(0);
+  const [tour, setTour] = useState<TourState>(IDLE_TOUR_STATE);
 
   const registerSelectedReconcile = atlas.registerSelectedReconcile;
 
@@ -88,7 +98,24 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
   const rankedPreview = useMemo(() => filtered.slice(0, 8), [filtered]);
 
   function focusRun(activity: RunActivity) {
+    if (tourPlaying) {
+      setTourPlaying(false);
+      setTourPaused(false);
+    }
     setSelected(activity);
+  }
+
+  const tourStopCount = useMemo(
+    () => buildTourStops(filtered).length,
+    [filtered],
+  );
+
+  function handleTourChange(next: TourState) {
+    setTour(next);
+    if (next.phase === "done" || (next.status === "idle" && tourPlaying)) {
+      setTourPlaying(false);
+      setTourPaused(false);
+    }
   }
 
   return (
@@ -179,6 +206,10 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
                 selectedId={activeSelection?.id}
                 onSelect={setSelected}
                 fillContainer
+                tourPlaying={tourPlaying}
+                tourPaused={tourPaused}
+                tourSkipNonce={tourSkipNonce}
+                onTourChange={handleTourChange}
               />
             ) : showInitialLoading ? (
               <MapSkeleton />
@@ -194,13 +225,33 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
           </>
         }
         mapCaption={
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <ModeToggle value={layers} onChange={setLayers} />
-            <span>
-              {filtered.length !== atlas.activities.length
-                ? `showing ${filtered.length} filtered · `
-                : ""}
-              click a run to fly the map there
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <ModeToggle value={layers} onChange={setLayers} />
+              <TourControls
+                tour={tour}
+                disabled={tourStopCount === 0 || showInitialLoading}
+                onPlay={() => {
+                  setSelected(null);
+                  setTourPaused(false);
+                  setTourPlaying(true);
+                }}
+                onPause={() => setTourPaused(true)}
+                onResume={() => setTourPaused(false)}
+                onStop={() => {
+                  setTourPlaying(false);
+                  setTourPaused(false);
+                  setTour(IDLE_TOUR_STATE);
+                }}
+                onSkip={() => setTourSkipNonce((n) => n + 1)}
+              />
+            </div>
+            <span className="font-mono text-[11px] text-[var(--muted)]">
+              {tourPlaying
+                ? tour.detail || "touring your atlas"
+                : filtered.length !== atlas.activities.length
+                  ? `showing ${filtered.length} filtered · click a run to fly there`
+                  : "click a run to fly there · or start a cinematic tour"}
             </span>
           </div>
         }
