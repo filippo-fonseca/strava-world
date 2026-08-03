@@ -35,11 +35,14 @@ Open [http://localhost:3000](http://localhost:3000) and click **explore demo**.
 
 1. Create an app at [Strava API settings](https://www.strava.com/settings/api)
 2. Set **Authorization Callback Domain** to the host only (no `https://`, no path).
-   Strava only allows **one** domain — use the exact host users open:
+   Strava only allows **one** domain. If this doesn’t match, Strava keeps you on
+   strava.com after “Authorize” instead of returning to the app:
    - Local: `localhost`
    - Custom domain: `stravaworld.hyperpolymath.com` ← **not** `hyperpolymath.com`
    - Or Vercel default: `strava-world-six.vercel.app`
-3. Copy values into `.env.local` (or Vercel Project → Settings → Environment Variables):
+3. Copy values into `.env.local` (or Vercel Project → Settings → Environment Variables).
+   `NEXT_PUBLIC_APP_URL` is the **canonical** origin used for OAuth `redirect_uri`
+   (must match the callback domain above):
 
 ```env
 STRAVA_CLIENT_ID=your_client_id

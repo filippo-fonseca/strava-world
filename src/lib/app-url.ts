@@ -1,9 +1,8 @@
 import type { NextRequest } from "next/server";
 
 /**
- * Resolve the public app origin for OAuth redirects.
- * Always prefer the incoming request host so custom domains
- * (e.g. stravaworld.hyperpolymath.com) win over stale Vercel env values.
+ * Resolve the public app origin for post-login redirects (where the browser goes).
+ * Prefer the incoming request host so users stay on the domain they started from.
  */
 export function getAppOrigin(request?: NextRequest | Request) {
   if (request) {
@@ -18,41 +17,70 @@ export function getAppOrigin(request?: NextRequest | Request) {
         )[0].trim();
       return `${proto}://${host}`;
     }
-    if (url.host && !url.host.startsWith("localhost")) {
+    if (url.host) {
       return url.origin;
     }
   }
 
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
-  if (fromEnv && !fromEnv.includes("localhost")) return fromEnv;
+  if (fromEnv) return fromEnv;
 
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, "")}`;
   }
 
-  if (fromEnv) return fromEnv;
   return "http://localhost:3000";
 }
 
-export function getStravaRedirectUri(request?: NextRequest | Request) {
-  // Prefer the live request host so custom domains aren't overridden by an
-  // old STRAVA_REDIRECT_URI pointing at *.vercel.app.
-  if (request) {
-    return `${getAppOrigin(request)}/api/auth/callback`;
-  }
+/**
+ * Canonical origin registered with Strava (Authorization Callback Domain).
+ * Strava only allows ONE callback domain — always use this for OAuth redirect_uri
+ * so authorize + token exchange match, regardless of which host the user opened.
+ */
+export function getCanonicalAppOrigin() {
+  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
 
   const configured = process.env.STRAVA_REDIRECT_URI?.replace(/\/$/, "");
-  if (
-    configured &&
-    !configured.includes("localhost") &&
-    !configured.includes("127.0.0.1")
-  ) {
-    return configured;
+  if (configured) {
+    try {
+      return new URL(
+        configured.includes("://") ? configured : `https://${configured}`,
+      ).origin;
+    } catch {
+      // fall through
+    }
   }
 
-  return `${getAppOrigin()}/api/auth/callback`;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.replace(/^https?:\/\//, "")}`;
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, "")}`;
+  }
+
+  return "http://localhost:3000";
+}
+
+/**
+ * redirect_uri sent to Strava authorize + token endpoints.
+ * Must use the canonical host that matches Strava's Authorization Callback Domain.
+ */
+export function getStravaRedirectUri(request?: NextRequest | Request) {
+  void request; // signature kept for call-site compatibility
+  const explicit = process.env.STRAVA_REDIRECT_URI?.replace(/\/$/, "");
+  if (explicit) {
+    if (explicit.endsWith("/api/auth/callback")) return explicit;
+    return `${explicit}/api/auth/callback`;
+  }
+
+  return `${getCanonicalAppOrigin()}/api/auth/callback`;
 }
 
 export function appPath(path: string, request?: NextRequest | Request) {
-  return new URL(path, `${getAppOrigin(request)}/`);
+  // After OAuth, prefer canonical origin so the session cookie is set on the
+  // same host as redirect_uri / future API calls.
+  const origin = getCanonicalAppOrigin() || getAppOrigin(request);
+  return new URL(path, `${origin}/`);
 }
