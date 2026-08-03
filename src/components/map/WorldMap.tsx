@@ -131,6 +131,55 @@ export function WorldMap({
     fittedRef.current = false;
   }, [activities.length]);
 
+  // Clicking a run in the history list (or marker) flies the map to that instance.
+  const selectedActivity = useMemo(
+    () =>
+      selectedId == null
+        ? null
+        : (activities.find((item) => item.id === selectedId) ?? null),
+    [activities, selectedId],
+  );
+
+  useEffect(() => {
+    if (!mapReady || !selectedActivity) return;
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    const bounds = boundsFromActivities([selectedActivity]);
+    if (!bounds) return;
+
+    try {
+      map.fitBounds(bounds, {
+        padding: 72,
+        duration: 700,
+        maxZoom: 14,
+        essential: true,
+      });
+    } catch (err) {
+      console.warn("focus fitBounds failed", err);
+    }
+    // Only re-fly when the selected run id changes (not on every activities refresh).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, selectedId]);
+
+  // When the filtered set changes (search/filters), reframe to matching runs.
+  const activityKey = useMemo(
+    () =>
+      activities
+        .map((a) => a.id)
+        .sort((a, b) => a - b)
+        .join(","),
+    [activities],
+  );
+
+  useEffect(() => {
+    if (!mapReady) return;
+    if (selectedId != null) return; // selection focus wins
+    fittedRef.current = false;
+    const id = window.setTimeout(() => resizeAndFit(true), 60);
+    return () => window.clearTimeout(id);
+  }, [mapReady, activityKey, selectedId, resizeAndFit]);
+
   useEffect(() => {
     const node = containerRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;
