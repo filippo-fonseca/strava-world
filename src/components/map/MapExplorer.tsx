@@ -121,6 +121,7 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
       }
     >
       <HeroMapLayout
+        mapFirstOnMobile
         left={
           <>
             <Panel inset className="!p-2">
