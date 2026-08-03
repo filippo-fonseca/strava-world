@@ -85,22 +85,17 @@ export function buildTourStops(activities: RunActivity[]): TourStop[] {
       (minLat + maxLat) / 2,
     ];
 
-    const runLabel =
-      bucket.activities.length === 1
-        ? "1 run"
-        : `${bucket.activities.length} runs`;
-
     stops.push({
       id: bucket.id,
       label: bucket.label,
-      detail: `${bucket.detail} · ${runLabel}`,
+      detail: bucket.detail,
       activityIds: bucket.activities.map((a) => a.id),
       bounds,
       center,
     });
   }
 
-  // West → east cinematic sweep; tie-break north → south.
+  // West → east around the world; tie-break north → south.
   stops.sort((a, b) => a.center[0] - b.center[0] || b.center[1] - a.center[1]);
 
   return stops;
