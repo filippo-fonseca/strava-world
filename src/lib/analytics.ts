@@ -92,7 +92,9 @@ function computeStreaks(activities: RunActivity[]) {
 
   let current = 0;
   if (days.has(todayKey) || days.has(yesterdayKey)) {
-    let cursor = days.has(todayKey) ? new Date(`${todayKey}T00:00:00Z`) : new Date(`${yesterdayKey}T00:00:00Z`);
+    const cursor = days.has(todayKey)
+      ? new Date(`${todayKey}T00:00:00Z`)
+      : new Date(`${yesterdayKey}T00:00:00Z`);
     while (true) {
       const key = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, "0")}-${String(cursor.getUTCDate()).padStart(2, "0")}`;
       if (!days.has(key)) break;

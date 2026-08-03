@@ -1,8 +1,8 @@
-# Strava World
+# strava world
 
-A plain atlas of your running life.
+Your Strava journey on one map — heat, routes, photos, pins — with a dark, barebones instrument shell and a dedicated stats page.
 
-Connect Strava (or explore the demo) and see where you’ve run on one world map — **heat** for the paths you return to, **routes** as you zoom in, **photo previews** across the globe, and **pins** when a run has no camera roll.
+Connect Strava (or explore the demo). The landing page centers a **live demo atlas** the way a field instrument frames its map: copy on the left, map in the middle, journey numbers on the right.
 
 <p align="center">
   <img alt="Strava World" src="public/og-preview.svg" width="720" />
@@ -10,15 +10,14 @@ Connect Strava (or explore the demo) and see where you’ve run on one world map
 
 ## Features
 
-- **Strava OAuth** with secure encrypted sessions (`iron-session`)
-- **Unified MapLibre map** (Carto Voyager tiles — no Mapbox token required)
-- **Zoom-aware layers** — heat, routes, and photos on the same map
-- **Common-path heat** — overlapping miles glow hotter
-- **Run photos** pinned as previews; **simple pins** when there are none
-- **Quiet statistics** — runs, countries, cities, distance, time, elevation, photos
-- **Smart caching / updates** — IndexedDB atlas + 6h server cache; **Sync** does incremental Strava pulls (48h overlap), full rebuild every 14 days or via right-click Sync
+- **StreetLens-style central map hero** on landing and `/map`
+- **Strava OAuth** with official **Connect with Strava** button + **Powered by Strava** attribution
+- **Unified MapLibre atlas** (Carto Voyager — no Mapbox token)
+- **Zoom-aware layers** — heat, routes, and photos together
+- **Journey stats (`/stats`)** — countries, cities, streaks, records, monthly distance, weekday rhythm
+- **Smart caching / sync** — IndexedDB + server cache; incremental Sync, full rebuild on demand
 - **Demo mode** with worldwide sample runs
-- **Mobile-friendly** layout — stacked atlas, large tap targets, bottom activity sheet
+- **Mobile-first** — large map hero, snap-scroll stats, bottom activity sheet
 
 ## Quick start
 
@@ -30,7 +29,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and click **Explore demo**.
+Open [http://localhost:3000](http://localhost:3000) and click **explore demo**.
 
 ## Strava API setup
 
@@ -56,6 +55,8 @@ openssl rand -base64 48
 ```
 
 Requested scopes: `read`, `activity:read_all`, `profile:read_all`.
+
+Brand assets under `public/brand/strava/` come from the [Strava API Brand Guidelines](https://developers.strava.com/guidelines/). Do not modify them.
 
 ### Vercel + custom domain checklist
 
@@ -83,15 +84,22 @@ Do **not** leave `STRAVA_REDIRECT_URI` pointed at `*.vercel.app` if you sign in 
 
 ```
 src/
-  app/                 # Next.js App Router pages + API routes
+  app/
+    (app)/map          # authenticated atlas
+    (app)/stats        # journey analytics
+    page.tsx           # public central-map hero
   components/
-    landing/           # Plain home
-    map/               # Atlas explorer + MapLibre layers
-    ui/                # Quiet primitives (Button, Panel, IconButton)
+    brand/             # official Strava buttons / logos
+    landing/           # hero landing
+    map/               # MapLibre atlas
+    shell/             # AppShell + HeroMapLayout
+    stats/             # stats page UI
+    ui/                # primitives
+  hooks/useRunsAtlas.ts
   lib/
-    strava/            # OAuth + API client
-    stats.ts           # Atlas statistics
-    demo-data.ts       # Offline worldwide demo runs
+    analytics.ts       # journey metrics
+    stats.ts           # core totals
+    strava/            # OAuth + API
 ```
 
 ## Deploy
@@ -100,7 +108,7 @@ Works on Vercel / any Node host:
 
 1. Set the env vars above
 2. Point Strava callback to `https://your-domain/api/auth/callback`
-3. Set `NEXT_PUBLIC_APP_URL` and `STRAVA_REDIRECT_URI` to that domain
+3. Set `NEXT_PUBLIC_APP_URL` (and avoid stale `STRAVA_REDIRECT_URI`)
 
 ## Contributing
 
@@ -112,5 +120,4 @@ MIT © Filippo Fonseca
 
 ---
 
-Built as an open-source love letter to long runs and quiet interfaces.
-Not affiliated with Strava.
+Open source. Not affiliated with Strava.
