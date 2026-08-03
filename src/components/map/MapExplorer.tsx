@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { LogOut, RefreshCw } from "lucide-react";
 import type { AthleteSummary, MapLayers, RunActivity } from "@/lib/types";
 import { DEFAULT_MAP_LAYERS } from "@/lib/types";
 import { formatSyncedAt } from "@/lib/runs-cache";
-import { formatDistance } from "@/lib/format";
-import { compactStatItems, computeJourneyAnalytics } from "@/lib/analytics";
+import { computeJourneyAnalytics } from "@/lib/analytics";
 import {
   EMPTY_RUN_FILTERS,
   filterActivities,
@@ -22,7 +20,7 @@ import { RunFiltersBar } from "@/components/map/RunFiltersBar";
 import { TourControls } from "@/components/map/TourControls";
 import { AppShell } from "@/components/shell/AppShell";
 import { HeroMapLayout } from "@/components/shell/HeroMapLayout";
-import { StatBlock } from "@/components/stats/StatBlock";
+import { AtlasSidePanel } from "@/components/stats/AtlasSidePanel";
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import {
@@ -76,10 +74,6 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
     () => computeJourneyAnalytics(filtered),
     [filtered],
   );
-  const compactStats = useMemo(
-    () => compactStatItems(analytics).slice(0, 6),
-    [analytics],
-  );
 
   const showInitialLoading = atlas.loading && atlas.activities.length === 0;
   const showMap = atlas.activities.length > 0;
@@ -95,7 +89,7 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
     .filter(Boolean)
     .join(" · ");
 
-  const rankedPreview = useMemo(() => filtered.slice(0, 8), [filtered]);
+  const rankedPreview = useMemo(() => filtered.slice(0, 6), [filtered]);
 
   function focusRun(activity: RunActivity) {
     if (tourPlaying) {
@@ -257,73 +251,13 @@ export function MapExplorer({ initialAthlete, isDemo }: Props) {
           </div>
         }
         right={
-          <>
-            {showInitialLoading
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="skeleton h-[88px] min-w-[9.5rem] shrink-0 snap-start lg:min-w-0"
-                  />
-                ))
-              : compactStats.map((item, index) => (
-                  <StatBlock
-                    key={item.key}
-                    label={item.label}
-                    value={item.value}
-                    accent={index === 0}
-                    hint={
-                      filtered.length !== atlas.activities.length
-                        ? "filtered"
-                        : undefined
-                    }
-                  />
-                ))}
-
-            <div className="min-w-[14rem] shrink-0 snap-start overflow-hidden rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface)] p-3 lg:min-w-0 lg:flex-1">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="mono-label">recent</p>
-                <Link
-                  href="/stats"
-                  className="link-accent font-mono text-[11px] lowercase"
-                >
-                  all stats →
-                </Link>
-              </div>
-              {showInitialLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="skeleton h-8 w-full" />
-                  ))}
-                </div>
-              ) : rankedPreview.length === 0 ? (
-                <p className="font-mono text-[11px] text-[var(--muted)]">
-                  no runs match
-                </p>
-              ) : (
-                <ul className="space-y-1">
-                  {rankedPreview.map((activity, index) => (
-                    <li key={activity.id} className="min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => focusRun(activity)}
-                        className="pressable flex min-h-10 w-full min-w-0 items-center gap-2 overflow-hidden rounded-[var(--radius)] px-1.5 py-1.5 text-left"
-                      >
-                        <span className="w-4 shrink-0 font-mono text-[11px] tabular-nums text-[var(--faint)]">
-                          {index + 1}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--ink)]">
-                          {activity.name}
-                        </span>
-                        <span className="shrink-0 font-mono text-[10px] text-[var(--muted)]">
-                          {formatDistance(activity.distance)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </>
+          <AtlasSidePanel
+            analytics={analytics}
+            recent={rankedPreview}
+            loading={showInitialLoading}
+            filtered={filtered.length !== atlas.activities.length}
+            onSelectRun={focusRun}
+          />
         }
       />
     </AppShell>

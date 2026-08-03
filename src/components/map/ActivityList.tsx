@@ -115,34 +115,34 @@ export function ActivityList({ activities, selectedId, onSelect }: Props) {
 
       {total > PAGE_SIZE ? (
         <div className="mt-2 flex min-w-0 flex-col gap-2 border-t border-[var(--line)] pt-2">
-          <div className="flex items-center justify-between gap-2">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <button
               type="button"
               disabled={safePage <= 0}
               onClick={() => goToPage(safePage - 1)}
-              className="pressable min-h-9 rounded-[var(--radius)] border border-[var(--line)] px-2.5 font-mono text-[11px] text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-35"
+              className="pressable inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--line)] px-3 font-mono text-[12px] text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-35"
             >
               ← prev
             </button>
-            <span className="min-w-0 truncate font-mono text-[10px] tabular-nums text-[var(--faint)]">
-              page {safePage + 1} / {totalPages}
+            <span className="px-1 text-center font-mono text-[11px] tabular-nums text-[var(--faint)]">
+              {safePage + 1} / {totalPages}
             </span>
             <button
               type="button"
               disabled={safePage >= totalPages - 1}
               onClick={() => goToPage(safePage + 1)}
-              className="pressable min-h-9 rounded-[var(--radius)] border border-[var(--line)] px-2.5 font-mono text-[11px] text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-35"
+              className="pressable inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--line)] px-3 font-mono text-[12px] text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-35"
             >
               next →
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             {nextChunk > 0 ? (
               <button
                 type="button"
                 onClick={() => setReveal((n) => n + PAGE_SIZE)}
-                className="link-accent font-mono text-[11px] lowercase"
+                className="pressable inline-flex min-h-11 items-center rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--accent-soft)] px-3 font-mono text-[12px] lowercase text-[var(--accent)]"
               >
                 show {nextChunk} more
               </button>
@@ -151,7 +151,7 @@ export function ActivityList({ activities, selectedId, onSelect }: Props) {
               <button
                 type="button"
                 onClick={() => setReveal(PAGE_SIZE)}
-                className="font-mono text-[11px] lowercase text-[var(--muted)] hover:text-[var(--ink)]"
+                className="pressable inline-flex min-h-11 items-center px-2 font-mono text-[12px] lowercase text-[var(--muted)] hover:text-[var(--ink)]"
               >
                 show less
               </button>

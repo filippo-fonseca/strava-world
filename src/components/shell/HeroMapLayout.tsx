@@ -60,11 +60,12 @@ export function HeroMapLayout({
 
       <aside
         className={clsx(
-          "flex min-h-0 flex-col gap-3 lg:col-start-3 lg:row-span-2 lg:row-start-1",
+          "flex min-h-0 min-w-0 flex-col gap-3 lg:col-start-3 lg:row-span-2 lg:row-start-1",
           mapFirstOnMobile && "order-3 lg:order-none",
         )}
       >
-        <div className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:overflow-x-visible lg:px-0 lg:pb-0 lg:[scrollbar-width:thin]">
+        {/* Mobile: natural stack / grid from children. Desktop: scrollable column. */}
+        <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:flex-1 lg:overflow-y-auto lg:[scrollbar-width:thin]">
           {right}
         </div>
       </aside>

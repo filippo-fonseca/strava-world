@@ -21,7 +21,10 @@ import { useRunsAtlas } from "@/hooks/useRunsAtlas";
 import { AppShell } from "@/components/shell/AppShell";
 import { Button } from "@/components/ui/Button";
 import { StatBlock } from "@/components/stats/StatBlock";
-import { BarList } from "@/components/stats/BarList";
+import { MonthlyDistanceChart } from "@/components/charts/MonthlyDistanceChart";
+import { WeekdayChart } from "@/components/charts/WeekdayChart";
+import { PlacesPieChart } from "@/components/charts/PlacesPieChart";
+import { PhotoDonut } from "@/components/charts/PhotoDonut";
 
 type Props = {
   initialAthlete: AthleteSummary | null;
@@ -39,6 +42,14 @@ export function StatsPage({ initialAthlete, isDemo }: Props) {
     () => computeJourneyAnalytics(atlas.activities),
     [atlas.activities],
   );
+
+  const runsWithPhotos = useMemo(() => {
+    let n = 0;
+    for (const a of atlas.activities) {
+      if (a.totalPhotoCount > 0) n += 1;
+    }
+    return n;
+  }, [atlas.activities]);
 
   const showLoading = atlas.loading && atlas.activities.length === 0;
   const athleteLabel = initialAthlete
@@ -67,11 +78,6 @@ export function StatsPage({ initialAthlete, isDemo }: Props) {
     return () => window.clearTimeout(t);
   }, [copied]);
 
-  const maxMonth = Math.max(
-    ...analytics.monthlyDistance.map((m) => m.distanceMeters),
-    1,
-  );
-
   return (
     <AppShell
       athleteLabel={athleteLabel}
@@ -96,21 +102,26 @@ export function StatsPage({ initialAthlete, isDemo }: Props) {
           >
             {atlas.syncing ? "syncing…" : "sync"}
           </Button>
-          <Button variant="ghost" size="sm" leftIcon={<LogOut size={14} />} onClick={atlas.logout}>
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<LogOut size={14} />}
+            onClick={atlas.logout}
+          >
             sign out
           </Button>
         </>
       }
     >
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="mono-label">journey</p>
           <h1 className="mt-1 font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--ink-display)] lowercase sm:text-3xl">
             stats
           </h1>
           <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
-            the numbers behind the miles — countries, streaks, records, and where
-            you keep coming back.
+            the numbers behind the miles — charts for places, rhythm, and
+            distance over time.
           </p>
           {formatAtlasSpan(analytics.overview) && (
             <p className="mt-2 font-mono text-[11px] text-[var(--faint)]">
@@ -122,7 +133,10 @@ export function StatsPage({ initialAthlete, isDemo }: Props) {
           <Button variant="secondary" size="sm" onClick={copySummary}>
             {copied ? "copied" : "copy summary"}
           </Button>
-          <Link href="/map" className="link-accent font-mono text-[12px] lowercase">
+          <Link
+            href="/map"
+            className="link-accent font-mono text-[12px] lowercase"
+          >
             open map →
           </Link>
         </div>
@@ -131,59 +145,127 @@ export function StatsPage({ initialAthlete, isDemo }: Props) {
       {atlas.error && atlas.activities.length === 0 ? (
         <div className="surface p-6 text-[var(--accent)]">
           <p>{atlas.error}</p>
-          <Button className="mt-3" variant="secondary" onClick={() => atlas.sync(true)}>
+          <Button
+            className="mt-3"
+            variant="secondary"
+            onClick={() => atlas.sync(true)}
+          >
             try again
           </Button>
         </div>
       ) : showLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="skeleton h-24" />
+            <div key={i} className="skeleton h-20" />
           ))}
         </div>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-8 pb-6">
           <section>
             <p className="mono-label mb-3">overview</p>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {compactStatItems(analytics).map((item) => (
-                <StatBlock key={item.key} label={item.label} value={item.value} />
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3">
+              {compactStatItems(analytics).map((item, i) => (
+                <StatBlock
+                  key={item.key}
+                  label={item.label}
+                  value={item.value}
+                  compact
+                  accent={i === 0}
+                />
               ))}
             </div>
           </section>
 
-          <section>
-            <p className="mono-label mb-3">averages & consistency</p>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              <StatBlock
-                label="avg distance"
-                value={formatDistance(analytics.avgDistanceMeters)}
+          <section className="grid gap-4 lg:grid-cols-2">
+            <div className="surface p-3 sm:p-4">
+              <p className="mono-label mb-3">monthly distance</p>
+              <MonthlyDistanceChart data={analytics.monthlyDistance} />
+            </div>
+            <div className="surface p-3 sm:p-4">
+              <p className="mono-label mb-3">weekday rhythm</p>
+              <WeekdayChart data={analytics.weekdayRuns} />
+            </div>
+          </section>
+
+          <section className="grid gap-4 lg:grid-cols-2">
+            <div className="surface p-3 sm:p-4">
+              <p className="mono-label mb-3">countries</p>
+              <PlacesPieChart
+                places={analytics.topCountries}
+                emptyLabel="no country tags on these runs"
               />
-              <StatBlock
-                label="avg moving"
-                value={formatDuration(analytics.avgMovingTimeSeconds)}
+            </div>
+            <div className="surface p-3 sm:p-4">
+              <p className="mono-label mb-3">cities</p>
+              <PlacesPieChart
+                places={analytics.topCities}
+                emptyLabel="no city tags on these runs"
               />
-              <StatBlock label="avg pace" value={analytics.avgPaceLabel} />
-              <StatBlock
-                label="current streak"
-                value={`${analytics.currentStreakDays}d`}
-                accent={analytics.currentStreakDays > 0}
+            </div>
+          </section>
+
+          <section className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+            <div className="surface p-3 sm:p-4">
+              <p className="mono-label mb-3">photo coverage</p>
+              <PhotoDonut
+                withPhotos={runsWithPhotos}
+                withoutPhotos={Math.max(
+                  0,
+                  analytics.overview.runs - runsWithPhotos,
+                )}
               />
-              <StatBlock
-                label="longest streak"
-                value={`${analytics.longestStreakDays}d`}
-              />
-              <StatBlock
-                label="this week / month"
-                value={`${analytics.runsThisWeek} / ${analytics.runsThisMonth}`}
-                hint="runs"
-              />
+            </div>
+            <div className="surface p-3 sm:p-4">
+              <p className="mono-label mb-3">averages & consistency</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <StatBlock
+                  compact
+                  label="avg distance"
+                  value={formatDistance(analytics.avgDistanceMeters)}
+                />
+                <StatBlock
+                  compact
+                  label="avg moving"
+                  value={formatDuration(analytics.avgMovingTimeSeconds)}
+                />
+                <StatBlock
+                  compact
+                  label="avg pace"
+                  value={analytics.avgPaceLabel}
+                />
+                <StatBlock
+                  compact
+                  label="current streak"
+                  value={`${analytics.currentStreakDays}d`}
+                  accent={analytics.currentStreakDays > 0}
+                />
+                <StatBlock
+                  compact
+                  label="longest streak"
+                  value={`${analytics.longestStreakDays}d`}
+                />
+                <StatBlock
+                  compact
+                  label="this week / month"
+                  value={`${analytics.runsThisWeek} / ${analytics.runsThisMonth}`}
+                />
+                <StatBlock
+                  compact
+                  label="elevation"
+                  value={formatElevation(analytics.overview.elevationMeters)}
+                />
+                <StatBlock
+                  compact
+                  label="photos"
+                  value={String(analytics.overview.photos)}
+                />
+              </div>
             </div>
           </section>
 
           <section>
             <p className="mono-label mb-3">records</p>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {[
                 analytics.longestRun && {
                   key: "longest",
@@ -214,94 +296,12 @@ export function StatsPage({ initialAthlete, isDemo }: Props) {
                 .map((item) => (
                   <StatBlock
                     key={item!.key}
+                    compact
                     label={item!.label}
                     value={item!.value}
                     hint={item!.hint}
                   />
                 ))}
-            </div>
-          </section>
-
-          <section className="grid gap-8 lg:grid-cols-2">
-            <div>
-              <p className="mono-label mb-3">top countries</p>
-              <BarList
-                items={analytics.topCountries.map((c) => ({
-                  key: c.name,
-                  label: c.name,
-                  value: c.runs,
-                  display: `${c.runs} · ${formatDistance(c.distanceMeters)}`,
-                }))}
-              />
-            </div>
-            <div>
-              <p className="mono-label mb-3">top cities</p>
-              <BarList
-                items={analytics.topCities.map((c) => ({
-                  key: c.name,
-                  label: c.name,
-                  value: c.runs,
-                  display: `${c.runs} · ${formatDistance(c.distanceMeters)}`,
-                }))}
-              />
-            </div>
-          </section>
-
-          <section>
-            <p className="mono-label mb-3">monthly distance</p>
-            <div className="flex h-36 items-end gap-1.5 border-b border-[var(--line)] pb-1">
-              {analytics.monthlyDistance.map((month) => (
-                <div
-                  key={month.key}
-                  className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
-                  title={`${month.label}: ${formatDistance(month.distanceMeters)}`}
-                >
-                  <div
-                    className="w-full max-w-[28px] rounded-[1px] bg-[var(--accent)]"
-                    style={{
-                      height: `${Math.max(
-                        month.distanceMeters > 0 ? 6 : 2,
-                        (month.distanceMeters / maxMonth) * 100,
-                      )}%`,
-                      opacity: month.distanceMeters > 0 ? 1 : 0.25,
-                    }}
-                  />
-                  <span className="truncate font-mono text-[9px] text-[var(--faint)]">
-                    {month.label.split(" ")[0]}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="grid gap-8 lg:grid-cols-2">
-            <div>
-              <p className="mono-label mb-3">weekday rhythm</p>
-              <BarList
-                items={analytics.weekdayRuns.map((d) => ({
-                  key: d.label,
-                  label: d.label,
-                  value: d.runs,
-                  display: String(d.runs),
-                }))}
-              />
-            </div>
-            <div>
-              <p className="mono-label mb-3">photos</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <StatBlock
-                  label="photos"
-                  value={String(analytics.overview.photos)}
-                />
-                <StatBlock
-                  label="runs with photos"
-                  value={`${analytics.photoCoveragePct}%`}
-                />
-                <StatBlock
-                  label="elevation"
-                  value={formatElevation(analytics.overview.elevationMeters)}
-                />
-              </div>
             </div>
           </section>
         </div>
