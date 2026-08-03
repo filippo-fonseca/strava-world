@@ -33,7 +33,7 @@ export function HeroMapLayout({
     >
       <aside
         className={clsx(
-          "flex min-h-0 flex-col gap-3 lg:col-start-1 lg:row-span-2 lg:row-start-1",
+          "flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden lg:col-start-1 lg:row-span-2 lg:row-start-1",
           mapFirstOnMobile && "order-2 lg:order-none",
         )}
       >
