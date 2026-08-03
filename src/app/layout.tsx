@@ -1,25 +1,26 @@
 import type { Metadata } from "next";
-import { Fraunces, Manrope } from "next/font/google";
+import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
 });
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-ibm-plex-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
-  title: "Strava World — a plain atlas of your runs",
+  title: "strava world — your runs on one map",
   description:
-    "Open-source Next.js app that maps your Strava runs: heatmaps, routes, photo memories, and quiet statistics.",
+    "Open-source atlas of your Strava journey: heatmaps, routes, photo memories, and purposeful stats.",
   openGraph: {
-    title: "Strava World",
+    title: "strava world",
     description:
-      "See every place you’ve run — heat, routes, photos, and stats on one map.",
+      "Every place you've run — heat, routes, photos, and journey stats on one map.",
     type: "website",
   },
 };
@@ -32,9 +33,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${manrope.variable} h-full antialiased`}
+      className={`${spaceGrotesk.variable} ${ibmPlexMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans text-[var(--ink)]">{children}</body>
+      <body className="min-h-full bg-[var(--bg)] font-sans text-[var(--ink)]">
+        {children}
+      </body>
     </html>
   );
 }

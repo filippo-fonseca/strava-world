@@ -21,7 +21,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={clsx(
-        "pressable grid h-11 w-11 place-items-center rounded-[10px] border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]",
+        "pressable grid h-11 w-11 place-items-center rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]",
         active && "border-[var(--accent)] text-[var(--accent)]",
         className,
       )}
