@@ -10,5 +10,15 @@ export async function GET(request: NextRequest) {
   }
 
   const redirectUri = getStravaRedirectUri(request);
+
+  // ?debug=1 → inspect the redirect_uri without starting OAuth
+  if (request.nextUrl.searchParams.get("debug") === "1") {
+    return NextResponse.json({
+      redirectUri,
+      authorizeUrl: getAuthorizeUrl({ redirectUri }),
+      hint: "Strava Authorization Callback Domain must equal the host of redirectUri (no https://, no path).",
+    });
+  }
+
   return NextResponse.redirect(getAuthorizeUrl({ redirectUri }));
 }

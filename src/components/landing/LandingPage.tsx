@@ -113,6 +113,18 @@ export function LandingPage({ stravaConfigured }: Props) {
                       {searchParams.get("detail")}
                     </p>
                   )}
+                  {error === "oauth_failed" && (
+                    <p className="font-mono text-[11px] leading-relaxed text-[var(--muted)]">
+                      in strava api settings, set authorization callback domain
+                      to this site&apos;s host only (e.g.{" "}
+                      <code className="text-[var(--ink)]">
+                        stravaworld.hyperpolymath.com
+                      </code>
+                      ) — no https, no path. also set{" "}
+                      <code className="text-[var(--ink)]">NEXT_PUBLIC_APP_URL</code>{" "}
+                      to that same origin.
+                    </p>
+                  )}
                 </div>
               )}
 

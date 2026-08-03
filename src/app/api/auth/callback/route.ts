@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getIronSession } from "iron-session";
 import { appPath, getStravaRedirectUri } from "@/lib/app-url";
-import { getSession } from "@/lib/session";
+import { getSessionOptions, type AppSession } from "@/lib/session";
 import { exchangeCode } from "@/lib/strava/client";
 
 function oauthErrorRedirect(
@@ -9,7 +10,7 @@ function oauthErrorRedirect(
   detail?: string,
 ) {
   const params = new URLSearchParams({ error: code });
-  if (detail) params.set("detail", detail.slice(0, 180));
+  if (detail) params.set("detail", detail.slice(0, 220));
   return NextResponse.redirect(appPath(`/?${params.toString()}`, request));
 }
 
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
 
   if (error) {
+    // Strava sends users here when they deny access (still our callback host).
     return oauthErrorRedirect(request, error);
   }
 
@@ -26,15 +28,24 @@ export async function GET(request: NextRequest) {
     return oauthErrorRedirect(request, "missing_code");
   }
 
+  // Must match the redirect_uri used in /api/auth/strava (canonical host).
   const redirectUri = getStravaRedirectUri(request);
 
   try {
     const athlete = await exchangeCode(code, redirectUri);
-    const session = await getSession();
+
+    // Attach Set-Cookie to the same redirect response (App Router cookie store
+    // + redirect can drop the session cookie otherwise).
+    const response = NextResponse.redirect(appPath("/map", request));
+    const session = await getIronSession<AppSession>(
+      request,
+      response,
+      getSessionOptions(),
+    );
     session.athlete = athlete;
     session.isDemo = false;
     await session.save();
-    return NextResponse.redirect(appPath("/map", request));
+    return response;
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown_error";
     console.error("Strava OAuth exchange failed", {
@@ -42,7 +53,6 @@ export async function GET(request: NextRequest) {
       message,
     });
 
-    // Help diagnose callback-domain mismatches without leaking secrets.
     const hint = message.toLowerCase().includes("redirect")
       ? `callback_mismatch:${redirectUri}`
       : `exchange_failed:${redirectUri}`;
